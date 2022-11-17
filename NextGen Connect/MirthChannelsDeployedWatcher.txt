@@ -1,0 +1,20 @@
+This produces a list of key, pairs for channels and state. Run it on a polling channel to see what's running and compare it to a master list of what should be running. If the lists don't match, fire an alert of your choosing.
+
+var channelStatus = {};
+var it = ChannelUtil.getChannelIds().toArray();
+var chanListLength = it.length;
+$c("chanListLength",chanListLength);
+for (var i = 0; i < chanListLength; i++) {
+    var thisChanId = it[i];
+    var chName = ChannelUtil.getChannelName(thisChanId);
+    var chState = ChannelUtil.getConnectorState(chName,0);
+    if (chState != null)	{
+    	chState = chState.toString();
+    }
+    channelStatus[chName] = chState;
+    $c(chName,chState);
+ }
+	
+
+var sourceTry = JSON.stringify(channelStatus);
+$c("SourceTry",sourceTry);

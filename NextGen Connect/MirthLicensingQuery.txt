@@ -1,0 +1,29 @@
+@jonb on mirth slack on 6 Oct 2022, seems to be a repost of an archived message.
+
+NextGen has been good about sending licensing data to me.
+Heres a really crude query that reads that data and maps it into postgres. From there it becomes reportable by date, hostname etc.
+
+with license_data as (
+	SELECT pg_read_file('/Users/jonathan.bartels/Downloads/teladoc_2022-10-06.json')::JSONB -> 'data' as licenses
+),
+attribute_data as (
+	select *
+	from license_data
+	join jsonb_path_query(licenses, '$.attributes') on true
+)
+select jsonb_path_query 
+into license_attributes
+from attribute_data
+;
+
+
+
+with almost_there as (
+select details.*    
+from license_attributes   
+join jsonb_to_record (jsonb_path_query) as details(fingerprint text, ip text, hostname text, created timestamp, updated timestamp, metadata jsonb) on true
+)
+select *, metadata -> 'serverId' as serverId, to_timestamp((metadata -> 'lastValidation')::BIGINT / 1000) as lastValidation
+from almost_there
+order by lastValidation ASC;
+	

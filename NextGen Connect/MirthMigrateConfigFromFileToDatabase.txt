@@ -1,0 +1,40 @@
+From @jonb in mirth slack on 4 Oct 2022
+
+I wrote a channel that reads the current config map and then writes it to the Mirth DB so that you can switch from file backed config maps to DB backed config maps.
+Just let the code run in a JS Reader and then flip the mirth.properties entry whenever you’re ready to change over.
+
+////////////////////////////////////////////////////
+// read mirth.properties and check the configurationmap.location property
+var classpathResource = com.mirth.connect.server.tools.ClassPathResource.getResourceURI('mirth.properties');
+var propsInputStream;
+var configmapLocation = 'Could not read!';
+try {
+    propsInputStream = new java.io.FileInputStream(classpathResource.getPath());
+    var serverProps = new java.util.Properties();
+    serverProps.load(propsInputStream);
+    configmapLocation = serverProps.getProperty('configurationmap.location');
+} finally {
+    if(propsInputStream) {
+        Packages.org.apache.commons.io.IOUtils.closeQuietly(propsInputStream);  
+    };
+}
+logger.error(channelName + " read config location as: " + configmapLocation);
+globalChannelMap.put('configmapLocation', configmapLocation);
+//if its DB undeploy ourselves
+if(configmapLocation == 'database'){
+    logger.info(channelName + " Detected 'database' configmap location. Channel is undeploying itself");
+    ChannelUtil.undeployChannel(channelName);
+}
+//if its file then dump our own serialized config
+if(configmapLocation == 'file'){
+    var configController = com.mirth.connect.server.controllers.ControllerFactory.getFactory().createConfigurationController();
+    var configMap = configController.getConfigurationProperties();
+    //persist to DB
+    //this is the same call that MC makes internally when saving to the DB
+    configController.saveProperty(
+        com.mirth.connect.server.controllers.DefaultConfigurationController.PROPERTIES_CORE, 
+        "configuration.properties", 
+        com.mirth.connect.model.converters.ObjectXMLSerializer.getInstance().serialize(configMap)
+    );
+}
+return "Saved configmap. Detected configmap location as: " + configmapLocation;
