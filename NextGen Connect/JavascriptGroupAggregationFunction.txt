@@ -5,7 +5,7 @@ It's a super super useful code snippet. If you have to group and sum some json, 
 var group = groupAndSum(formattedJSON, ['Office', 'Practitioner','PreviousBalance', 'PaymentsThisPeriod'],['Charges']);
 I recently had some json to aggregate and by passing in the keys this handles it really well
 
-//snippet
+//snippet made with the help of https://stackoverflow.com/a/66782165
 function groupAndSum(arr, groupKeys, sumKeys) {
   var hash = Object.create(null),
       grouped = [];
