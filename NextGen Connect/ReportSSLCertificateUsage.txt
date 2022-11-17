@@ -1,0 +1,16 @@
+Report on SSL Certificate Usage in Mirth Connect - https://gist.github.com/jonbartels/f99d08208a0e880e2cee160262dda4c8
+
+with channel_xml as (
+	select 
+	name, 
+	xmlparse(document channel) as channel_xml
+	from channel c )
+select
+	unnest(xpath('//trustedCertificates/trustCACerts/text()', channel_xml))::TEXT as trust_ca_certs,
+	unnest(xpath('//trustedCertificates/trustedCertificateAliases/string/text()', channel_xml))::TEXT as trusted_cert_alias,
+	unnest(xpath('//localCertificateAlias/text()', channel_xml))::TEXT as private_alias,
+	unnest(xpath('//keyAlias/text()', channel_xml))::TEXT as interop_alias --update from rbiderman in Slack. Thanks dude!
+	array_agg(name) as channel_names
+from channel_xml
+group by 1,2,3,4
+;
