@@ -1,9 +1,0 @@
-Initiator: @U04ARV2RZHB "Bhushan U" 14 Nov 2022
-Solution provider: agermano
-
-Hello Team, I need some advice on migrating mirthconnect application with local postgresql database server from windows 2008 to windows 2012 server.
-So far I did postgres database backup and restore plus mirthconnect configuration files backup and restore. But there is still some discrepancy between new server and old server.
-
-Issue: channels stats not showing up after postgres database backup and restore then configuration files backup and restore
-Reason: channels statistics are saved per server.id
-Solution: Update the current server's ID to that of the original server, https://docs.nextgen.com/bundle/Mirth_User_Guide_41/page/connect/connect/topics/c_Application_Data_Directory_connect_ug.html
