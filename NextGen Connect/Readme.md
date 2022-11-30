@@ -1,5 +1,8 @@
 # NextGen Connect FAQs
 
+## What is the layout of a Mirth database?
+See [this ER diagram](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png).
+
 ## Calculate average response time for messages for a channel
 ````sql
 with started as (select message_id, received_date from d_mm388 where connector_name = 'Source'),
