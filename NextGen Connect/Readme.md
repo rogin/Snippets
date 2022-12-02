@@ -1,5 +1,21 @@
 # NextGen Connect FAQs
 
+## Channel naming conventions
+Initiator: Rodger Glenn, 2 Dec 2022
+
+jonb:
+	1) have a convention
+	2) enforce it during code reviews
+	I really like the naming conventions that designate from_X_to_Y_#### where #### is a port.
+
+Jarrod:
+I usually use the source name and the type
+	XYZ_BATCH
+	LLL_REALTIME FEED
+
+pacmano:
+SITECODE_function. If multitenant EHRBRAND_function. and USE TAGS FOR PORTS as channel names are max 40 chars or so.
+
 ## What is the layout of a Mirth database?
 See [this ER diagram](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png).
 
