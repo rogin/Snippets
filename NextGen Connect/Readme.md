@@ -16,6 +16,9 @@ I usually use the source name and the type
 pacmano:
 SITECODE_function. If multitenant EHRBRAND_function. and USE TAGS FOR PORTS as channel names are max 40 chars or so.
 
+Michael Hobbs:
+	I like to also start any channel that listens on a port with said port number. Then if I need I can click the channel view and sort by name.
+
 ## What is the layout of a Mirth database?
 See [this ER diagram](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png).
 
