@@ -1,120 +1,244 @@
 # NextGen Connect FAQs
 
-## Channel naming conventions
+<!-- vscode-markdown-toc -->
+
+* 1. [Enable JS map lookups but hide the mapped values from the dashboard view](#EnableJSmaplookupsbuthidethemappedvaluesfromthedashboardview)
+* 2. [Understand XML's name() vs localName()](#UnderstandXMLsnamevslocalName)
+* 3. [Return multiple objects from a JS reader](#ReturnmultipleobjectsfromaJSreader)
+* 4. [Channel naming conventions](#Channelnamingconventions)
+* 5. [Convert Timestamp EST to PST with format YYYYMMDDhhmmss](#ConvertTimestampESTtoPSTwithformatYYYYMMDDhhmmss)
+* 6. [Auto-generate value for MSH.10](#Auto-generatevalueforMSH.10)
+* 7. [Channel deployment tips](#Channeldeploymenttips)
+* 8. [Channel development tips](#Channeldevelopmenttips)
+* 9. [Message searching tips](#Messagesearchingtips)
+* 10. [Create index on metadata column(s)](#Createindexonmetadatacolumns)
+  * 10.1. [Option #1](#Option1)
+  * 10.2. [Option #2](#Option2)
+* 11. [Add HL7 fields out of order](#AddHL7fieldsoutoforder)
+* 12. [Channel stats missing after DB migration](#ChannelstatsmissingafterDBmigration)
+* 13. [case-insensitive JSON fields](#case-insensitiveJSONfields)
+* 14. [Migrate file-backed config map into Mirth DB](#Migratefile-backedconfigmapintoMirthDB)
+* 15. [Compare running channels against a master list](#Comparerunningchannelsagainstamasterlist)
+* 16. [Group and Sum using JS](#GroupandSumusingJS)
+* 17. [Improved channel cloning](#Improvedchannelcloning)
+* 18. [What is the layout of a Mirth database?](#WhatisthelayoutofaMirthdatabase)
+* 19. [Calculate average response time for a given channel's messages](#Calculateaverageresponsetimeforagivenchannelsmessages)
+* 20. [Report on SSL Certificate Usage](#ReportonSSLCertificateUsage)
+* 21. [Read and map Mirth licensing data](#ReadandmapMirthlicensingdata)
+* 22. [Prune messages while avoiding errored messages](#Prunemessageswhileavoidingerroredmessages)
+
+<!-- vscode-markdown-toc-config
+	numbering=true
+	autoSave=true
+	/vscode-markdown-toc-config -->
+<!-- /vscode-markdown-toc -->
+## 1. <a name='EnableJSmaplookupsbuthidethemappedvaluesfromthedashboardview'></a>Enable JS map lookups but hide the mapped values from the dashboard view
+
+An interesting discussion 19 Dec 2022 to generate lookups but omit its confidential values from dashboard view.
+
+agermano:
+
+````javascript
+var definitions = {a: 1, b: 2, c: 3, d: 1}
+var hm = new java.util.HashMap(definitions)
+var wrapper = Object.create(hm)
+wrapper.toJSON = () => "No peeking!"
+````
+
+## 2. <a name='UnderstandXMLsnamevslocalName'></a>Understand XML's name() vs localName()
+
+20 Dec 2022 by agermano
+
+````javascript
+js> msg = <xml><a/></xml>
+<xml>
+  <a/>
+</xml>
+js> msg.name() instanceof QName
+true
+js> JSON.stringify(msg.name())
+{"uri":"","localName":"xml"}
+js> msg.name().toString()
+xml
+js> typeof msg.localName()
+string
+js> msg.localName()
+xml
+````
+
+````javascript
+js> default xml namespace = "uri:test"
+js> msg = <xml><a/></xml>
+<xml xmlns="uri:test">
+  <a/>
+</xml>
+js> JSON.stringify(msg.name())
+{"uri":"uri:test","localName":"xml"}
+js> msg.name().toString()
+uri:test::xml
+js> msg.localName()
+xml
+````
+
+## 3. <a name='ReturnmultipleobjectsfromaJSreader'></a>Return multiple objects from a JS reader
+
+agermano 14 Dec 2022
+
+stringify each object, then pass the returned array to the ArrayList constructor
+
+````javascript
+var json = '[{"id":1},{"id":2}]'
+var arrayOfObjects = JSON.parse(json)
+return new java.util.ArrayList(arrayOfObjects.map(o => JSON.stringify(o)))
+````
+
+jonb's input needing the above inclusion
+
+````javascript
+try{
+    dbConn = commonDBconnection();
+    //the XML trick lets us read queries in MC
+    //the array to json stuff returns a JSON array we can just parse in MC as a single row
+    //the pendcount returns no rows if we dont have capacity
+    //the limit handles our batch size
+    var sqlText = <SQLText>
+        array_to_json(array_agg(row_to_json(faxage_status))) FROM reports.faxage_status
+        WHERE
+        {pendcount} = 0
+        AND shortstatus = 'failure'
+        AND longstatus IN ('Job aborted by request', 'Job cannot be stopped - unknown error' )
+        LIMIT {$('faxage_reprocess_batch_size')}
+    </SQLText>;
+    var result = dbConn.executeCachedQuery(sqlText.toString());
+    if(result.next()){
+        resultArray = JSON.parse(result.getString(1));
+    }
+    if(result.next()){
+        throw "Expected only one result row, got more than one";
+    }
+} finally {
+    if(dbConn) {dbConn.close()};
+}
+return resultArray;
+````
+
+## 4. <a name='Channelnamingconventions'></a>Channel naming conventions
+
 Initiator: Rodger Glenn, 2 Dec 2022
 
 jonb:
-	1) have a convention
-	2) enforce it during code reviews
-	I really like the naming conventions that designate from_X_to_Y_#### where #### is a port.
+
+ 1. have a convention
+ 2. enforce it during code reviews
+ I really like the naming conventions that designate from_X_to_Y_#### where #### is a port.
 
 Jarrod:
 I usually use the source name and the type
-	XYZ_BATCH
-	LLL_REALTIME FEED
+  ex. XYZ_BATCH
+  ex. LLL_REALTIME FEED
 
 pacmano:
 SITECODE_function. If multitenant EHRBRAND_function. and USE TAGS FOR PORTS as channel names are max 40 chars or so.
 
 Michael Hobbs:
-	I like to also start any channel that listens on a port with said port number. Then if I need I can click the channel view and sort by name.
+I like to also start any channel that listens on a port with said port number. Then if I need I can click the channel view and sort by name.
 
-## What is the layout of a Mirth database?
-See [this ER diagram](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png).
+## 5. <a name='ConvertTimestampESTtoPSTwithformatYYYYMMDDhhmmss'></a>Convert Timestamp EST to PST with format YYYYMMDDhhmmss
 
-## Calculate average response time for messages for a channel
-````sql
-with started as (select message_id, received_date from d_mm388 where connector_name = 'Source'),
-     max_send_date as (select message_id, max(send_date) as final_send_date from d_mm388 group by message_id),
-     per_message_start_end as (select s.message_id,
-                                      s.received_date,
-                                      msd.final_send_date,
-                                      date_part('milliseconds', msd.final_send_date - s.received_date) as ms
-                               from started s
-                                        join max_send_date msd on msd.message_id = s.message_id)
-select avg(ms)
-from per_message_start_end as average_ms
+Conversation on 5 Dec 2022 by Anibal Jodorcovsky
+
+joshm solution:
+
+````javascript
+function addHL7Timezone(hl7DateStr) {
+  var formatter_hl7 = new java.text.SimpleDateFormat("yyyyMMddHHmmss");
+  formatter_hl7.setTimeZone(java.util.TimeZone.getTimeZone("US/Mountain"));
+  var formatter_tz = new java.text.SimpleDateFormat("yyyyMMddHHmmssZ");
+  formatter_tz.setTimeZone(java.util.TimeZone.getTimeZone("US/Mountain"));
+  var newDate = formatter_tz.format(formatter_hl7.parse(hl7DateStr));
+  
+  return newDate
+}
 ````
 
-## Add fields out of order
-https://github.com/nextgenhealthcare/connect/issues/633#issuecomment-626857519
+Michael Hobbs solution:
+
+````javascript
+const {LocalDateTime, ZoneId, ZoneOffset, format: {DateTimeFormatter}, ZonedDateTime} = java.time
+const parseFmt = DateTimeFormatter.ofPattern('yyyyMMddHHmmssZ')
+const writeFmt = DateTimeFormatter.ofPattern('MM/dd/yyyy HH:mm:ss z')
+const zonedDateTime = ZonedDateTime.parse(msg.approvedDT, parseFmt).withZoneSameInstant(ZoneId.of('America/New_York'))
+const appDtStr = String(zonedDateTime.format(writeFmt))
+````
+
+## 6. <a name='Auto-generatevalueforMSH.10'></a>Auto-generate value for MSH.10
+
+Initiator: Nathan Corron
+anyone know if there is a function in mirth to get an incrementing unique number that could be used for say MSH-10?  Needs to be numeric
+
+````javascript
+Date.now()
+````
+
+See [JS example](https://jsfiddle.net/pvj79z8s/) and [docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now)
+
+## 7. <a name='Channeldeploymenttips'></a>Channel deployment tips
+
+9 Dec 2022
+A user noticed that his channel changes were not being deployed. Be sure to undeploy the channel first as it resolved his issue.
+
+## 8. <a name='Channeldevelopmenttips'></a>Channel development tips
+
+* Set your response data type to RAW. That will force your response transformer code to always execute no matter what. (joshm 7 Dec 2022)
+** user's code to error after X send attempts was failing, needed this [to resolve](https://github.com/nextgenhealthcare/connect/discussions/4795). (29 Dec 2022)
+
+## 9. <a name='Messagesearchingtips'></a>Message searching tips
+
+* Set "page size" to 1 to greatly speed up queries you expect to contain only one result. (pacmano 7 Dec 2022)
+
+## 10. <a name='Createindexonmetadatacolumns'></a>Create index on metadata column(s)
+
+By default, indices are not created for metadata columns.
+
+### 10.1. <a name='Option1'></a>Option #1
+
+jonbartels' [gist](https://gist.github.com/jonbartels/38ffbb101ea32f981cc9950a21ec6809)
+
+### 10.2. <a name='Option2'></a>Option #2
+
+Michael Hobbs' solution
+[DBConnection.js](DBConnection.js) needed for ChannelUtils
+With [ChannelUtils.js](ChannelUtils.js) you can set metadata index and then get the message by metadata index in another channel
+
+Example to set the index
+
+````javascript
+ChannelUtils.setMessageIndex('ACCESSION', accession, siteName, 'mirthdbV3')
+````
+
+Example to get an index
+
+````javascript
+const messages = ChannelUtils.getMessageByIndexV2({
+      key: 'ACCESSION', value: accession,
+      channelID: channelID, dbConfig: this._dbConfig,
+      parseXml: true, sort: true, filter: ['XO', 'NW', 'SC'],
+      debug: false
+    })
+````
+
+## 11. <a name='AddHL7fieldsoutoforder'></a>Add HL7 fields out of order
+
+[FixHL7NodeOrder.js](FixHL7NodeOrder.js) copied from [this comment](https://github.com/nextgenhealthcare/connect/issues/633#issuecomment-626857519)
+
+Usage example
 
 ````javascript
 msg = fixHL7NodeOrder(msg);
-
-function fixHL7NodeOrder(node) {
-	// Create output node
-	var newNode = new XML();
-	// In case the node is an XMLList of multiple siblings, loop through each sibling
-	for each (sibling in node) {
-		// Create new sibling node
-		var newSibling = new XML('<'+sibling.name().toString()+'/>');
-		// Iterate through each child node
-		for each (child in sibling.children()) {
-			// If the child has its own children, then recursively fix the node order of the child
-			if (child.hasComplexContent()) {
-				newSibling.appendChild(fixHL7NodeOrder(child));
-			}
-			// If the child doesn't have its own children, then just add the child to the new sibling node
-			else {
-				newSibling.appendChild(child);
-			}
-		}
-		// After recursively fixing all of the child nodes, now we'll fix the current node
-		newNode += sortHL7Node(newSibling);
-	}
-	// Return the fixed node
-	return newNode;
-}
-
-// Helper function for fixHL7NodeOrder
-function sortHL7Node(node) {
-	// If the node has no children, then there's nothing to sort
-	if (node.hasSimpleContent()) {
-		return node;
-	}
-	// Create new output node
-	var newNode = new XML('<'+node.name().toString()+'/>');
-	// Iterate through each child in the node
-	for each (child in node.children()) {
-		// If the child has a QName, then we can sort on it
-		if (child.name()) {
-			// Get the current "index" of the child. Id est, if the QName is PID.3.1, then the index is 1
-			curChildIndex = parseInt(child.name().toString().substring(child.name().toString().lastIndexOf('.')+1),10);
-			// Boolean placeholder
-			var inserted = false;
-			// Iterate through each child currently in the NEW node
-			for (var i = 0; i <= newNode.children().length()-1; i++) {
-				// Get the index of the child of the new node
-				loopChildIndex = parseInt(newNode.child(i).name().toString().substring(newNode.child(i).name().toString().lastIndexOf('.')+1),10);
-				// If the child we want to insert has a lower index then the current child of the new node, then we're going to insert the child
-				// right before the current newNode child
-				if (curChildIndex < loopChildIndex) {
-					// Insert the child
-					newNode.insertChildBefore(newNode.children()[i],child);
-					// Set our flag, indicating that an insertion was made
-					inserted = true;
-					// No need to continue iteration
-					break;
-				}
-			}
-				// If no insertion was made, then the index of the child we want to insert is greater than or equal to all of the
-				// indices of the children that have already been inserted in newNode. So, we'll just append the child to the end.
-				if (!inserted) {
-					newNode.appendChild(child);
-				}
-		}
-	}
-	// Return the sorted HL7 node
-	return newNode;
-}
 ````
-Imported Comment. Original Details:
-Author: narupley
-Created: 2011-12-22T08:20:30.000-0800
 
+## 12. <a name='ChannelstatsmissingafterDBmigration'></a>Channel stats missing after DB migration
 
-## Channel stats missing after DB migration
 Initiator: @U04ARV2RZHB "Bhushan U" 14 Nov 2022
 Solution provider: agermano
 
@@ -122,10 +246,10 @@ Hello Team, I need some advice on migrating mirthconnect application with local 
 So far I did postgres database backup and restore plus mirthconnect configuration files backup and restore. But there is still some discrepancy between new server and old server.
 
 Issue: channels stats not showing up after postgres database backup and restore then configuration files backup and restore
-Reason: channels statistics are saved per server.id
-Solution: Update the current server\'s ID to that of the original server, https://docs.nextgen.com/bundle/Mirth_User_Guide_41/page/connect/connect/topics/c_Application_Data_Directory_connect_ug.html
+Reason: channels statistics are saved per server\.id
+Solution: Update the current server\'s ID to that of the original server, <https://docs.nextgen.com/bundle/Mirth_User_Guide_41/page/connect/connect/topics/c_Application_Data_Directory_connect_ug.html>
 
-## case-insensitive JSON fields
+## 13. <a name='case-insensitiveJSONfields'></a>case-insensitive JSON fields
 
 Initiator:
 @itsjohn: Hi All, Is there. a way to make JSON payload fields case insensitive when mapping in Mirth so I can write msg['foo'] and Mirth accepts {"foo":""}, {"FOO":""} and {"Foo":""}
@@ -133,13 +257,14 @@ Initiator:
 Solution by: agermano
 Solution date: 22 Nov 2022
 Solution:
+
 ```javascript
 function reviver(k,v) {
-	var lower = k.toLowerCase();
-	if (k === "" || k === lower) {
-		return v;
-	}
-	this[lower] = v;
+  var lower = k.toLowerCase();
+  if (k === "" || k === lower) {
+    return v;
+  }
+  this[lower] = v;
 }
 var raw = JSON.stringify({FOO: 1, bar: 2, BaZ: {sAnDwIcH: 3}});
 msg = JSON.parse(raw, reviver);
@@ -147,26 +272,8 @@ msg.baz.sandwich = 4;
 JSON.stringify(msg);
 ```
 
-## Report on SSL Certificate Usage
-Details: https://gist.github.com/jonbartels/f99d08208a0e880e2cee160262dda4c8
-Solution:
-```sql
-with channel_xml as (
-	select 
-	name, 
-	xmlparse(document channel) as channel_xml
-	from channel c )
-select
-	unnest(xpath('//trustedCertificates/trustCACerts/text()', channel_xml))::TEXT as trust_ca_certs,
-	unnest(xpath('//trustedCertificates/trustedCertificateAliases/string/text()', channel_xml))::TEXT as trusted_cert_alias,
-	unnest(xpath('//localCertificateAlias/text()', channel_xml))::TEXT as private_alias,
-	unnest(xpath('//keyAlias/text()', channel_xml))::TEXT as interop_alias --update from rbiderman in Slack. Thanks dude!
-	array_agg(name) as channel_names
-from channel_xml
-group by 1,2,3,4;
-```
+## 14. <a name='Migratefile-backedconfigmapintoMirthDB'></a>Migrate file-backed config map into Mirth DB
 
-## Write file-backed config map into Mirth DB
 From @jonb in mirth slack on 4 Oct 2022
 
 I wrote a channel that reads the current config map and then writes it to the Mirth DB so that you can switch from file backed config maps to DB backed config maps.
@@ -209,39 +316,10 @@ if(configmapLocation == 'file'){
 return "Saved configmap. Detected configmap location as: " + configmapLocation;
 ````
 
-# Read and map Mirth licensing data
-@jonb on mirth slack on 6 Oct 2022, seems to be a repost of an archived message.
+## 15. <a name='Comparerunningchannelsagainstamasterlist'></a>Compare running channels against a master list
 
-NextGen has been good about sending licensing data to me.
-Heres a really crude query that reads that data and maps it into postgres. From there it becomes reportable by date, hostname etc.
-
-````sql
-with license_data as (
-	SELECT pg_read_file('/Users/jonathan.bartels/Downloads/teladoc_2022-10-06.json')::JSONB -> 'data' as licenses
-),
-attribute_data as (
-	select *
-	from license_data
-	join jsonb_path_query(licenses, '$.attributes') on true
-)
-select jsonb_path_query 
-into license_attributes
-from attribute_data;
-````
-a bit improved:
-````sql
-with almost_there as (
-select details.*    
-from license_attributes   
-join jsonb_to_record (jsonb_path_query) as details(fingerprint text, ip text, hostname text, created timestamp, updated timestamp, metadata jsonb) on true
-)
-select *, metadata -> 'serverId' as serverId, to_timestamp((metadata -> 'lastValidation')::BIGINT / 1000) as lastValidation
-from almost_there
-order by lastValidation ASC;
-````
-
-## Compare running channels against a master list
 This produces a list of key, pairs for channels and state. Run it on a polling channel to see what's running and compare it to a master list of what should be running. If the lists don't match, fire an alert of your choosing.
+
 ````javascript
 var channelStatus = {};
 var it = ChannelUtil.getChannelIds().toArray();
@@ -251,8 +329,8 @@ for (var i = 0; i < chanListLength; i++) {
     var thisChanId = it[i];
     var chName = ChannelUtil.getChannelName(thisChanId);
     var chState = ChannelUtil.getConnectorState(chName,0);
-    if (chState != null)	{
-    	chState = chState.toString();
+    if (chState != null) {
+      chState = chState.toString();
     }
     channelStatus[chName] = chState;
     $c(chName,chState);
@@ -262,7 +340,8 @@ var sourceTry = JSON.stringify(channelStatus);
 $c("SourceTry",sourceTry);
 ````
 
-## foo
+## 16. <a name='GroupandSumusingJS'></a>Group and Sum using JS
+
 User nafwa03 on Mirth Slack 17 Nov 2022
 
 nafwa03's commentary:
@@ -294,7 +373,9 @@ function groupAndSum(arr, groupKeys, sumKeys) {
   return grouped;
 }
 ````
+
 refactor by agermano 17 Nov 2022
+
 ````javascript
 function groupAndSum(arr, groupByKeys, sumKeys) {
     var hash = Object.create(null),
@@ -319,9 +400,14 @@ function groupAndSum(arr, groupByKeys, sumKeys) {
 }
 ````
 
-## Improved channel cloning
-https://mirthconnect.slack.com/archives/C02SW0K4D/p1668089121891089
+## 17. <a name='Improvedchannelcloning'></a>Improved channel cloning
+
+<https://mirthconnect.slack.com/archives/C02SW0K4D/p1668089121891089>
 Chris: Before my upgrade from 3.8.0 -> 4.1.1, I had a channel which I used to create other channels from templates. It clones the channel and then makes sure that various Code Template Libraries are copied along with them, and tags, too, since "channel clone" is IMO incomplete because it skips those things.
+
+See [ImprovedChannelCloning.js](ImprovedChannelCloning.js)
+
+Usage example
 
 ````javascript
 var createdChannels = [];
@@ -334,150 +420,91 @@ createdChannels.push(result.getName());
 
 setChannelLibrariesByName(createdChannelIds, ['Shared Integration', 'EHR Stuff'], serverEventContext);
 setChannelGroupByName(createdChannelIds, 'PCC Practices', serverEventContext);
-
-//helper functions
-function cloneSingleChannel(templateChannelName, targetChannelName, tagNames, serverEventContext) {
-  if(targetChannelName.length > 40) {
-    throw "Channel name is too long (40 characters max): " + targetChannelName;
-  }
-
-  var channelCtl = com.mirth.connect.server.controllers.ControllerFactory.getFactory().createChannelController();
-
-  var existingChannel = channelCtl.getChannelByName(targetChannelName);
-  if(existingChannel)
-    throw "Channel '" + targetChannelName + "' already exists";
-
-  var newChannel = channelCtl.getChannelByName(templateChannelName);
-  if(!newChannel)
-    throw "Template channel '" + templateChannelName + "' does not exist";
-  
-  newChannel.setId(UUIDGenerator.getUUID());
-  newChannel.setName(targetChannelName);
-  newChannel.setRevision(0);
-  var script = newChannel.getDeployScript();
-  script = script.replaceAll('CLIENT_SYSTEM_ID_SHORTENED', shortenedSystemId).replaceAll('CLIENT_SYSTEM_ID', siteId);
-  newChannel.setDeployScript(script);
-
-  // Generate the proper channel "export data", which includes tags and pruning settings
-  var tags = new java.util.ArrayList(); // Use ArrayList instead of [] because it must be mutable
-  for(i=0; i<tagNames.length; ++i) {
-    tags.add(new com.mirth.connect.model.ChannelTag(tagNames[i]));
-  }
-  newChannel.getExportData().setChannelTags(tags);
-  var pruningSettings = new com.mirth.connect.model.ChannelPruningSettings();
-  pruningSettings.setPruneMetaDataDays(45);
-  var metadata = new com.mirth.connect.model.ChannelMetadata();
-  metadata.setEnabled(true);
-  metadata.setPruningSettings(pruningSettings);
-
-  newChannel.getExportData().setMetadata(metadata);
-
-  channelCtl.updateChannel(newChannel, serverEventContext, false);
-
-  return newChannel;
-}
-
-function setChannelLibrariesByName(channelIds, libraryNames, serverEventContext) {
-  var codeLibraryCtl = com.mirth.connect.server.controllers.ControllerFactory.getFactory().createCodeTemplateController();
-  var updateLibraries = false;
-  var libraries = codeLibraryCtl.getLibraries(null, false);
-
-  for(var library in Iterator(libraries)) {
-    var channels = library.getEnabledChannelIds();
-
-    for(j=0; j<channelIds.length; ++j) {
-    	 var channelId = channelIds[j];
-      // Add '' to libraryNames.getName to ensure we are searching for the right kind of object (string) in libraryNames
-      if(libraryNames.includes(library.getName() + '')) { // Use [].includes for javascript arrays
-        if(!channels.contains(channelId)) { // Use Collection.contains for Java collections
-          channels.add(channelId);
-          updateLibraries = true;
-          logger.debug('Will add channel ' + channelId + ' to library ' + library.getName());
-        }
-      } else {
-        if(channels.contains(channelId)) {
-           logger.debug('Will remove channel ' + channelId + ' from library ' + library.getName());
-           channels.remove(channelId);
-           updateLibraries = true;
-        }
-      }
-    }
-  }
-
-  if(updateLibraries) {
-    var result = codeLibraryCtl.updateLibraries(libraries, serverEventContext, false);
-
-    if(!result) {
-      logger.error('Failed to update code libraries');
-    }
-
-    return result;
-  } else {
-    logger.debug('No code-library updates are necessary.');
-    return true; // All is well
-  }
-}
-
-function setChannelGroupByName(channelIds, groupName, serverEventContext) {
-  var channelCtl = com.mirth.connect.server.controllers.ControllerFactory.getFactory().createChannelController();
-  var updateGroups = false;
-  var groups = channelCtl.getChannelGroups(null);
-
-  for(var group in Iterator(groups)) {
-    var channels = group.getChannels();
-
-    for(j=0; j<channelIds.length; ++j) {
-      var found = false;
-    	 var channelId = channelIds[j];
-
-      for(k = channels.iterator(); k.hasNext(); ) {
-        var channel = k.next();
-
-        if(channelId.equals(channel.getId())) {
-          found = true;
-
-          if((group.getName() + '') == groupName) {
-            logger.debug('Channel ' + channelId + ' is already in group ' + group.getName());
-            // Do nothing; already in the right place
-          } else {
-            logger.debug('Will remove channel ' + channelId + ' from group ' + group.getName());
-            k.remove();
-            updateGroups = true;
-          }
-        }
-      }
-
-      if(!found && (group.getName() + '') == groupName) {
-        logger.debug('Will add channel ' + channelId + ' to group ' + group.getName());
-        channels.add(new com.mirth.connect.model.Channel(channelId));
-        updateGroups = true;
-      }
-    }
-  }
-
-
-  if(updateGroups) {
-    // updateChannelGroups requires a Set<>, and the "removedChannelGroupIds" must not be null
-    var result = channelCtl.updateChannelGroups(new java.util.HashSet(groups), new java.util.HashSet(), false);
-
-    if(!result) {
-      logger.error('Failed to update channel groups');
-    }
-
-    return result;
-  } else {
-    logger.debug('No channel group updates are necessary.');
-    return true; // All is well
-  }
-}
 ````
-## Prune while avoiding errored messages
+
+## 18. <a name='WhatisthelayoutofaMirthdatabase'></a>What is the layout of a Mirth database?
+
+See [this ER diagram](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png).
+
+## 19. <a name='Calculateaverageresponsetimeforagivenchannelsmessages'></a>Calculate average response time for a given channel's messages
+
+````sql
+with started as (select message_id, received_date from d_mm388 where connector_name = 'Source'),
+     max_send_date as (select message_id, max(send_date) as final_send_date from d_mm388 group by message_id),
+     per_message_start_end as (select s.message_id,
+                                      s.received_date,
+                                      msd.final_send_date,
+                                      date_part('milliseconds', msd.final_send_date - s.received_date) as ms
+                               from started s
+                                        join max_send_date msd on msd.message_id = s.message_id)
+select avg(ms)
+from per_message_start_end as average_ms
+````
+
+## 20. <a name='ReportonSSLCertificateUsage'></a>Report on SSL Certificate Usage
+
+Details: <https://gist.github.com/jonbartels/f99d08208a0e880e2cee160262dda4c8>
+Solution:
+
+```sql
+with channel_xml as (
+  select 
+  name, 
+  xmlparse(document channel) as channel_xml
+  from channel c )
+select
+  unnest(xpath('//trustedCertificates/trustCACerts/text()', channel_xml))::TEXT as trust_ca_certs,
+  unnest(xpath('//trustedCertificates/trustedCertificateAliases/string/text()', channel_xml))::TEXT as trusted_cert_alias,
+  unnest(xpath('//localCertificateAlias/text()', channel_xml))::TEXT as private_alias,
+  unnest(xpath('//keyAlias/text()', channel_xml))::TEXT as interop_alias --update from rbiderman in Slack. Thanks dude!
+  array_agg(name) as channel_names
+from channel_xml
+group by 1,2,3,4;
+```
+
+## 21. <a name='ReadandmapMirthlicensingdata'></a>Read and map Mirth licensing data
+
+@jonb on mirth slack on 6 Oct 2022, seems to be a repost of an archived message.
+
+NextGen has been good about sending licensing data to me.
+Heres a really crude query that reads that data and maps it into postgres. From there it becomes reportable by date, hostname etc.
+
+````sql
+with license_data as (
+  SELECT pg_read_file('/Users/jonathan.bartels/Downloads/teladoc_2022-10-06.json')::JSONB -> 'data' as licenses
+),
+attribute_data as (
+  select *
+  from license_data
+  join jsonb_path_query(licenses, '$.attributes') on true
+)
+select jsonb_path_query 
+into license_attributes
+from attribute_data;
+````
+
+a bit improved:
+
+````sql
+with almost_there as (
+select details.*    
+from license_attributes   
+join jsonb_to_record (jsonb_path_query) as details(fingerprint text, ip text, hostname text, created timestamp, updated timestamp, metadata jsonb) on true
+)
+select *, metadata -> 'serverId' as serverId, to_timestamp((metadata -> 'lastValidation')::BIGINT / 1000) as lastValidation
+from almost_there
+order by lastValidation ASC;
+````
+
+## 22. <a name='Prunemessageswhileavoidingerroredmessages'></a>Prune messages while avoiding errored messages
+
 2 Sept 2022
 Commenter:
 This is close but its still deleting too much content.
 The goal is
-- "do not delete anything for any connector on an errored message"
-- "for any not errored message, delete everything except the raw source message and source map"
+
+* "do not delete anything for any connector on an errored message"
+* "for any not errored message, delete everything except the raw source message and source map"
 
 ````sql
 WITH 
@@ -486,26 +513,26 @@ WITH
 --sniff check the EXPLAIN plan in PROD
 --status is indexed with message_id this should be fast
 errors as (
-	select distinct message_id from d_mm11 mm
-	where mm.status = 'E'
-	AND mm.received_date <= now() - INTERVAL '1 minutes'
-	AND mm.received_date >= now() - INTERVAL '365 Days'
-	order by message_id DESC
+  select distinct message_id from d_mm11 mm
+  where mm.status = 'E'
+  AND mm.received_date <= now() - INTERVAL '1 minutes'
+  AND mm.received_date >= now() - INTERVAL '365 Days'
+  order by message_id DESC
 )
 ,candidates AS (
-	SELECT metadata_id, mc.message_id, content_type, errors.message_id as err_msg_id
-	--, data_type, status, error_code
-	FROM d_mc11 mc
-	INNER JOIN d_mm11 mm ON mm.id = mc.metadata_id AND mm.message_id = mc.message_id
-	left outer join errors on errors.message_id = mc.message_id 
-	WHERE 
-		(
-			(metadata_id = 0 AND content_type NOT IN (1,15))
-			OR (metadata_id <> 0)
-		)
-		AND errors.message_id is null
-		AND mm.received_date <= now() - INTERVAL '1 minutes'
-		-- dont need a floor date since the raw pruner will run and take care of those
+  SELECT metadata_id, mc.message_id, content_type, errors.message_id as err_msg_id
+  --, data_type, status, error_code
+  FROM d_mc11 mc
+  INNER JOIN d_mm11 mm ON mm.id = mc.metadata_id AND mm.message_id = mc.message_id
+  left outer join errors on errors.message_id = mc.message_id 
+  WHERE 
+    (
+      (metadata_id = 0 AND content_type NOT IN (1,15))
+      OR (metadata_id <> 0)
+    )
+    AND errors.message_id is null
+    AND mm.received_date <= now() - INTERVAL '1 minutes'
+    -- dont need a floor date since the raw pruner will run and take care of those
 )
 --select target.* FROM d_mc11 mc, candidates target
 DELETE FROM d_mc11 mc USING candidates target
