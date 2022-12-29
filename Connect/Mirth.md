@@ -1,37 +1,5 @@
 # NextGen Connect FAQs
 
-<!-- vscode-markdown-toc -->
-
-* 1. [Enable JS map lookups but hide the mapped values from the dashboard view](#EnableJSmaplookupsbuthidethemappedvaluesfromthedashboardview)
-* 2. [Understand XML's name() vs localName()](#UnderstandXMLsnamevslocalName)
-* 3. [Return multiple objects from a JS reader](#ReturnmultipleobjectsfromaJSreader)
-* 4. [Channel naming conventions](#Channelnamingconventions)
-* 5. [Convert Timestamp EST to PST with format YYYYMMDDhhmmss](#ConvertTimestampESTtoPSTwithformatYYYYMMDDhhmmss)
-* 6. [Auto-generate value for MSH.10](#Auto-generatevalueforMSH.10)
-* 7. [Channel deployment tips](#Channeldeploymenttips)
-* 8. [Channel development tips](#Channeldevelopmenttips)
-* 9. [Message searching tips](#Messagesearchingtips)
-* 10. [Create index on metadata column(s)](#Createindexonmetadatacolumns)
-  * 10.1. [Option #1](#Option1)
-  * 10.2. [Option #2](#Option2)
-* 11. [Add HL7 fields out of order](#AddHL7fieldsoutoforder)
-* 12. [Channel stats missing after DB migration](#ChannelstatsmissingafterDBmigration)
-* 13. [case-insensitive JSON fields](#case-insensitiveJSONfields)
-* 14. [Migrate file-backed config map into Mirth DB](#Migratefile-backedconfigmapintoMirthDB)
-* 15. [Compare running channels against a master list](#Comparerunningchannelsagainstamasterlist)
-* 16. [Group and Sum using JS](#GroupandSumusingJS)
-* 17. [Improved channel cloning](#Improvedchannelcloning)
-* 18. [What is the layout of a Mirth database?](#WhatisthelayoutofaMirthdatabase)
-* 19. [Calculate average response time for a given channel's messages](#Calculateaverageresponsetimeforagivenchannelsmessages)
-* 20. [Report on SSL Certificate Usage](#ReportonSSLCertificateUsage)
-* 21. [Read and map Mirth licensing data](#ReadandmapMirthlicensingdata)
-* 22. [Prune messages while avoiding errored messages](#Prunemessageswhileavoidingerroredmessages)
-
-<!-- vscode-markdown-toc-config
-	numbering=true
-	autoSave=true
-	/vscode-markdown-toc-config -->
-<!-- /vscode-markdown-toc -->
 ## 1. <a name='EnableJSmaplookupsbuthidethemappedvaluesfromthedashboardview'></a>Enable JS map lookups but hide the mapped values from the dashboard view
 
 An interesting discussion 19 Dec 2022 to generate lookups but omit its confidential values from dashboard view.
@@ -422,7 +390,7 @@ setChannelLibrariesByName(createdChannelIds, ['Shared Integration', 'EHR Stuff']
 setChannelGroupByName(createdChannelIds, 'PCC Practices', serverEventContext);
 ````
 
-## 18. <a name='WhatisthelayoutofaMirthdatabase'></a>What is the layout of a Mirth database?
+## 18. <a name='What-is-the-layout-of-a-Mirth-database'></a>What is the layout of a Mirth database?
 
 See [this ER diagram](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png).
 
