@@ -1,10 +1,103 @@
 # NextGen Connect FAQs
 
+## Others tracking FAQs
+
+See [_jonb_'s useful gists](<https://gist.github.com/jonbartels>) which overlap here in some areas. His SSL writeup is excellent.
+
+## Other projects on github using Mirth?
+
+See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in Mirth Slack found useful.
+
+## minimal example using _JSch_
+
+5 Jan 2023 by _joshm_
+
+Related [javadoc](https://javadoc.io/doc/com.jcraft/jsch/latest/index.html)
+
+````javascript
+importPackage(com.jcraft.jsch);
+importPackage(java.io);
+importPackage(java.lang);
+importPackage(java.nio.charset);
+
+const user = 'someUser';
+const password = 'this1Su1t@S3<ur3';
+const hostname = 'mysftp.hostname.com';
+const port = '22';
+const directory = '/In';
+
+
+var jsch = new JSch();
+jsch.setConfig('StrictHostKeyChecking','no');
+var session = jsch.getSession(user, hostname, port);
+session.setPassword(password);
+session.setTimeout(2000);
+session.connect();
+var channel = session.openChannel('sftp');
+var ioexception = new Packages.java.io.IOException;
+channel.connect();
+channel.cd(directory); //Folder on the SFTP server where file will be found
+
+
+var msgBias = new Packages.java.io.ByteArrayInputStream(connectorMessage.getRawData().getBytes());
+channel.put(msgBias, UUIDGenerator.getUUID() + '.hl7'); 
+channel.exit();
+````
+
+## My integration of _lodash_ isn't functioning as expected
+
+It matters which CDN you download its code from. [This one](https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js) was confirmed to work by _itsjohn_ on 10 Jan 2023.
+
+## I encounter odd String and XML errors intermittently when sending between channels
+
+Ensure you do not have a [xalan](https://mvnrepository.com/artifact/xalan/xalan) jar in your custom library. (_rogin_ to fill in what problems were presenting)
+
+## Performance metrics in AWS
+
+Seen in 2022
+"Can anyone point me in the direction of documentation/tips around best practice data pruner configuration settings? We have a server with > 1000 channels and millions of messages processed each day. We only store 5 days worth of data on each channel and prune daily, but the data pruner is taking over 32 hours to run with some individual channels taking over 45 minutes to prune about 209k messages and 2million content rows.  Database is MySQL running on an AWS RDS instance.  Is that the best I can expect the pruner to perform?  Am I better off pruning less often even though it will need to churn through more messages per run? Should I be tweaking the block size (currently set at 1000)?  Thanks for any pointers!"
+
+same person:
+"this instance is running on an AWS c5.12xlarge EC2 instance running linux and pointing to an AWS RDS r5.4xlarge MySQL DB. 1174 deployed channels with varying degrees of volume on them.  The server is mainly receiving messages via TCP and then writing out to a MSSQL DB so not a ton of complicated processing happening within the channels themselves."
+
+## Send additional data with router.routeMessage
+
+2 Jan 2023
+
+Issue: user expressed using routeMessage() didn't send 'sourceChannelId(s)' and 'sourceMessageId(s)' like direct channel-to-channel does.
+
+Solution #1: It's a [requested feature](https://github.com/nextgenhealthcare/connect/issues/5293)
+Solution #2: create a new destination that filters on the existing logic you're using for routeMessage()
+Solution #3: Link in Situation #1 also has a code solution, but it's a manual addition.
+Solution #4: another manual addition
+
+````javascript
+var attributes = new Packages.java.util.HashMap();
+var newSourceMap = connectorMap.entrySet().iterator();
+
+logger.info(newSourceMap + " :: has items :: " + newSourceMap.hasNext());
+        // Start the iteration and copy the Key and Value
+        // for each Map to the other Map.
+        while (newSourceMap.hasNext())
+        {
+     var mapItem = newSourceMap.next();
+            // using put method to copy one Map to Other
+            attributes.put(mapItem.getKey(),
+                           mapItem.getValue());
+        }
+
+attributes.put("channelId", channelId);
+attributes.put("messageId", connectorMessage.getMessageId()); //TODO pass as Java Long to avoid floating point conversion
+var message = new RawMessage(msg); //removed Packages.com.mirth.connect.server.userutil.
+message.setSourceMap(attributes);
+router.routeMessage('Test1', message);
+````
+
 ## Enable JS map lookups but hide the mapped values from the dashboard view
 
 An interesting discussion 19 Dec 2022 to generate lookups but omit its confidential values from dashboard view.
 
-agermano:
+_agermano_:
 
 ````javascript
 var definitions = {a: 1, b: 2, c: 3, d: 1}
@@ -15,7 +108,7 @@ wrapper.toJSON = () => "No peeking!"
 
 ## Understand XML's name() vs localName()
 
-20 Dec 2022 by agermano
+20 Dec 2022 by _agermano_
 
 ````javascript
 js> msg = <xml><a/></xml>
@@ -50,7 +143,7 @@ xml
 
 ## Return multiple objects from a JS reader
 
-agermano 14 Dec 2022
+_agermano_ 14 Dec 2022
 
 stringify each object, then pass the returned array to the ArrayList constructor
 
@@ -60,7 +153,7 @@ var arrayOfObjects = JSON.parse(json)
 return new java.util.ArrayList(arrayOfObjects.map(o => JSON.stringify(o)))
 ````
 
-jonb's input needing the above inclusion
+_jonb_'s input needing the above inclusion
 
 ````javascript
 try{
@@ -94,28 +187,28 @@ return resultArray;
 
 Initiator: Rodger Glenn, 2 Dec 2022
 
-jonb:
+_jonb_:
 
  1. have a convention
  2. enforce it during code reviews
  I really like the naming conventions that designate from_X_to_Y_#### where #### is a port.
 
-Jarrod:
+_Jarrod_:
 I usually use the source name and the type
   ex. XYZ_BATCH
   ex. LLL_REALTIME FEED
 
-pacmano:
+_pacmano_:
 SITECODE_function. If multitenant EHRBRAND_function. and USE TAGS FOR PORTS as channel names are max 40 chars or so.
 
-Michael Hobbs:
+_Michael Hobbs_:
 I like to also start any channel that listens on a port with said port number. Then if I need I can click the channel view and sort by name.
 
 ## Convert Timestamp EST to PST with format YYYYMMDDhhmmss
 
-Conversation on 5 Dec 2022 by Anibal Jodorcovsky
+Conversation on 5 Dec 2022 by _Anibal Jodorcovsky_
 
-joshm solution:
+_joshm_ solution:
 
 ````javascript
 function addHL7Timezone(hl7DateStr) {
@@ -129,7 +222,7 @@ function addHL7Timezone(hl7DateStr) {
 }
 ````
 
-Michael Hobbs solution:
+_Michael Hobbs_ solution:
 
 ````javascript
 const {LocalDateTime, ZoneId, ZoneOffset, format: {DateTimeFormatter}, ZonedDateTime} = java.time
@@ -157,12 +250,12 @@ A user noticed that his channel changes were not being deployed. Be sure to unde
 
 ## Channel development tips
 
-* Set your response data type to RAW. That will force your response transformer code to always execute no matter what. (joshm 7 Dec 2022)
+* Set your response data type to RAW. That will force your response transformer code to always execute no matter what. (_joshm_ 7 Dec 2022)
 ** user's code to error after X send attempts was failing, needed this [to resolve](https://github.com/nextgenhealthcare/connect/discussions/4795). (29 Dec 2022)
 
 ## Message searching tips
 
-* Set "page size" to 1 to greatly speed up queries you expect to contain only one result. (pacmano 7 Dec 2022)
+* Set "page size" to 1 to greatly speed up queries you expect to contain only one result. (_pacmano_ 7 Dec 2022)
 
 ## Create index on metadata column(s)
 
@@ -170,11 +263,11 @@ By default, indices are not created for metadata columns.
 
 ### Option #1
 
-jonbartels' [gist](https://gist.github.com/jonbartels/38ffbb101ea32f981cc9950a21ec6809)
+_jonbartels_' [gist](https://gist.github.com/jonbartels/38ffbb101ea32f981cc9950a21ec6809)
 
 ### Option #2
 
-Michael Hobbs' solution
+_Michael Hobbs_' solution
 [DBConnection.js](DBConnection.js) needed for ChannelUtils
 With [ChannelUtils.js](ChannelUtils.js) you can set metadata index and then get the message by metadata index in another channel
 
@@ -207,7 +300,7 @@ msg = fixHL7NodeOrder(msg);
 
 ## Channel stats missing after DB migration
 
-Initiator: @U04ARV2RZHB "Bhushan U" 14 Nov 2022
+Initiator: _Bhushan U_ on 14 Nov 2022
 Solution provider: agermano
 
 Hello Team, I need some advice on migrating mirthconnect application with local postgresql database server from windows 2008 to windows 2012 server.
@@ -215,14 +308,14 @@ So far I did postgres database backup and restore plus mirthconnect configuratio
 
 Issue: channels stats not showing up after postgres database backup and restore then configuration files backup and restore
 Reason: channels statistics are saved per server\.id
-Solution: Update the current server\'s ID to that of the original server, <https://docs.nextgen.com/bundle/Mirth_User_Guide_41/page/connect/connect/topics/c_Application_Data_Directory_connect_ug.html>
+Solution: Update the current server\'s ID to that of the original server, see [user guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_41/page/connect/connect/topics/c_Application_Data_Directory_connect_ug.html).
 
 ## Case-insensitive JSON fields
 
 Initiator:
 @itsjohn: Hi All, Is there. a way to make JSON payload fields case insensitive when mapping in Mirth so I can write msg['foo'] and Mirth accepts {"foo":""}, {"FOO":""} and {"Foo":""}
 
-Solution by: agermano
+Solution by: _agermano_
 Solution date: 22 Nov 2022
 Solution:
 
@@ -242,7 +335,7 @@ JSON.stringify(msg);
 
 ## Migrate file-backed config map into Mirth DB
 
-From @jonb in mirth slack on 4 Oct 2022
+_jonb_ on 4 Oct 2022
 
 I wrote a channel that reads the current config map and then writes it to the Mirth DB so that you can switch from file backed config maps to DB backed config maps.
 Just let the code run in a JS Reader and then flip the mirth.properties entry whenever you are ready to change over.
@@ -310,9 +403,9 @@ $c("SourceTry",sourceTry);
 
 ## Group and Sum using JS
 
-User nafwa03 on Mirth Slack 17 Nov 2022
+_nafwa03_ on 17 Nov 2022
 
-nafwa03's commentary:
+_nafwa03_'s commentary:
 It\'s a super super useful code snippet. If you have to group and sum some json, you just use it like
 var group = groupAndSum(formattedJSON, ['Office', 'Practitioner', 'PreviousBalance', 'PaymentsThisPeriod'],['Charges']);
 I recently had some json to aggregate and by passing in the keys this handles it really well
@@ -342,7 +435,7 @@ function groupAndSum(arr, groupKeys, sumKeys) {
 }
 ````
 
-refactor by agermano 17 Nov 2022
+_agermano_'s refactor 17 Nov 2022
 
 ````javascript
 function groupAndSum(arr, groupByKeys, sumKeys) {
@@ -370,8 +463,8 @@ function groupAndSum(arr, groupByKeys, sumKeys) {
 
 ## Improved channel cloning
 
-<https://mirthconnect.slack.com/archives/C02SW0K4D/p1668089121891089>
-Chris: Before my upgrade from 3.8.0 -> 4.1.1, I had a channel which I used to create other channels from templates. It clones the channel and then makes sure that various Code Template Libraries are copied along with them, and tags, too, since "channel clone" is IMO incomplete because it skips those things.
+[Archived link](https://mirthconnect.slack.com/archives/C02SW0K4D/p1668089121891089)
+_Chris_: Before my upgrade from 3.8.0 -> 4.1.1, I had a channel which I used to create other channels from templates. It clones the channel and then makes sure that various Code Template Libraries are copied along with them, and tags, too, since "channel clone" is IMO incomplete because it skips those things.
 
 See [ImprovedChannelCloning.js](ImprovedChannelCloning.js)
 
@@ -432,7 +525,7 @@ group by 1,2,3,4;
 
 ## Read and map Mirth licensing data
 
-@jonb on mirth slack on 6 Oct 2022, seems to be a repost of an archived message.
+_jonb_ on 6 Oct 2022, seems to be a repost of an archived message.
 
 NextGen has been good about sending licensing data to me.
 Heres a really crude query that reads that data and maps it into postgres. From there it becomes reportable by date, hostname etc.
