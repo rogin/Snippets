@@ -41,3 +41,22 @@ PS >"foo|bar".Split("|")
 foo
 bar
 ````
+
+## pre-sized arrays
+
+from [here](https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/everything-about-arrays?view=powershell-7.2#initialize-with-0)
+
+````powershell
+PS> [int[]]::new(4)
+0
+0
+0
+0
+#We can use the multiplying trick to do this too.
+PS> $data = @(0) * 4
+PS> $data
+0
+0
+0
+0
+````
