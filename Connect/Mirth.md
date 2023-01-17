@@ -4,9 +4,101 @@
 
 See [_jonb_'s useful gists](<https://gist.github.com/jonbartels>) which overlap here in some areas. His SSL writeup is excellent.
 
+See [Michael Hobbs' gists](https://gist.github.com/MichaelLeeHobbs) which include an excellent [Mirth channel table resizer for PG](https://gist.github.com/MichaelLeeHobbs/67980d165fc68880eb2ab283c673244b).
+
+NextGen manages a [repo](https://github.com/nextgenhealthcare/connect-examples) for various code templates.
+
 ## Other projects on github using Mirth?
 
 See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in Mirth Slack found useful.
+
+## Embed Base64 image into PDF
+
+Kicked off by _mkopinsky_ 16 Jan 2023
+
+_agermano_ with all the important bits.
+
+### Option 1
+
+He recommends Document Writer as "the document writer actually gives you the option of writing to a mirth attachment, which makes it really easy to embed in a second destination".
+
+### Option 2
+
+"You can use the legacy Flying Saucer and iText libs which are [still included](https://github.com/nextgenhealthcare/connect/tree/4.2.0/server/lib/extensions/doc)". "Data urls work as long as you've registered a url protocol handler for 'data' types".
+
+Echoing the [forum resolution](https://forums.mirthproject.io/forum/mirth-connect/support/16056-pdf-document-writer-and-base-64-encoded-images#post175260) below.
+
+User can embed
+
+````html
+<img src="data:image/jpg;base64,YOURDATAHERE" style="height: 153px; width: 118px;"/>
+````
+
+Then set
+
+````
+-Djava.protocol.handler.pkgs=org.xhtmlrenderer.protocols
+-classpath/a extensions/doc/lib/flying-saucer-core-9.0.1.jar
+````
+
+_The first line adds the "data" protocol handler to the search path used by the URL class.
+The second line appends the jar to the end of the classpath at startup. This is an option used by the install4j launcher and not directly passed to the jvm_
+
+### Option 3
+
+Use the newer libraries
+"The main libraries used now are openhtmltopdf running on top of PDFBox 2.x" and the "new lib also supports svg graphics".
+
+## Sample message transformations from HL7v2 to FHIR
+
+13 Jan 2023
+_jonb_ recommends [these](https://confluence.hl7.org/display/OO/v2+Sample+Messages).
+
+## Have a HTTP Listener to respond with gzip data
+
+It's [automatic now](https://forums.mirthproject.io/forum/mirth-connect/support/13156-web-service-and-compress#post80922()) when given the proper request headers.
+
+## Option to check for duplicates in given time period
+
+User wants to check for duplicate messages in a given 12 hour period. (11 Jan 2023)
+
+See [_agermano_](<https://forums.mirthproject.io/forum/mirth-connect/support/19116-filter-smtp-destination-unique-only?p=174475#post174475>)'s code snippet using guava which is included with Mirth. Guava allows expiring entries in multiple ways.
+
+## Using GPG with Mirth
+
+12 Jan 2023
+
+"Good Morning, are there any good sources for gpg encryption of a file within mirth? I see different posts that are from the old forums, but was looking for any examples of implementation."
+
+For running GPG outside Mirth, use this [code template](https://github.com/nextgenhealthcare/connect-examples/tree/master/Code%20Templates/Execute%20Runtime%20Command) to execute the GPG lib available on the system with the required parameters.
+
+For running within Mirth, you need an additional GPG library, says [here](https://forums.mirthproject.io/forum/mirth-connect/support/13544-can-i-encrypt-a-file-in-gpg-using-mirth). This [wrapper](https://github.com/neuhalje/bouncy-gpg) may be useful, but no one vouched for it.
+
+## Expand an attachmentId received from another channel's response transformer
+
+_pacmano_'s question and solution 10 Jan 2023
+
+"If I am adding an attachment in a response transformer, grabbing the attachment id and assigning to a JSON field, sending the JSON to another channel, how do I expand that attachment on the destination channel when finally ready to post/write it somewhere?"
+
+````javascript
+//It gets the attachment from the other channel by manually building the long attachment string.
+//When sent to the destination channel and written to disk it, expands as expected.
+
+// sample input:
+//“base64image” : “${ATTACH:d0921ccb-4e9a-48fc-9a9c-a584c74bdd66:347:efc7ecc4-cf91-493b-8fe1-bbdac0e3a9b4}“,
+
+var imageInfoArray = msg['document']['data']['base64image'].split(':');
+var chanId = imageInfoArray[1];
+var messageId = parseInt(imageInfoArray[2]);
+var attachmentId = imageInfoArray[3].replace('}','');
+var base64Decode = false;
+var attachmentContent = getAttachment(chanId, messageId,attachmentId,base64Decode).getContentString();
+````
+
+## Mirth licensing
+
+Q1. Is CURES available under existing licenses or separate from other plugins?
+A1. _Travis West_: "It is separate and requires Gold or Platinum bundles." (Essentially an upcharge in addition to platinum.)
 
 ## minimal example using _JSch_
 
@@ -252,6 +344,7 @@ A user noticed that his channel changes were not being deployed. Be sure to unde
 
 * Set your response data type to RAW. That will force your response transformer code to always execute no matter what. (_joshm_ 7 Dec 2022)
 ** user's code to error after X send attempts was failing, needed this [to resolve](https://github.com/nextgenhealthcare/connect/discussions/4795). (29 Dec 2022)
+* Prefer destination queueing over source queueing as source queueing will take a performance hit on deployment with its message recovery. (forgot who provided this)
 
 ## Message searching tips
 
