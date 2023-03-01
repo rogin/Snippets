@@ -60,3 +60,19 @@ PS> $data
 0
 0
 ````
+
+## Tracing commands
+
+Use [_trace-command_](https://learn.microsoft.com/en-us/powershell/module/Microsoft.PowerShell.Utility/Trace-Command?view=powershell-7.3)
+
+````powershell
+trace-command -expression {"g*","s*" | Get-Alias } -name parameterbinding -pshost
+#to see all options for -name above
+Get-TraceSource
+````
+
+## misc
+
+<https://devblogs.microsoft.com/powershell-community/cheat-sheet-console-experience/>
+
+<https://github.com/devops-collective-inc/big-book-of-powershell-gotchas/blob/master/SUMMARY.md>
