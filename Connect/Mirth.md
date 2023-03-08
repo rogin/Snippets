@@ -1,6 +1,6 @@
 # NextGen Connect FAQs
 
-## 1. <a name='OtherstrackingFAQs'></a>Others tracking FAQs
+## <a name='OtherstrackingFAQs'></a>Others tracking FAQs
 
 See [_jonb_'s useful gists](<https://gist.github.com/jonbartels>) which overlap here in some areas. His [SSL writeup](https://gist.github.com/jonbartels/8abd121901eb930f46245d9ef0f5710e) is excellent.
 
@@ -8,34 +8,268 @@ See [Michael Hobbs' gists](https://gist.github.com/MichaelLeeHobbs) which includ
 
 NextGen manages a [repo](https://github.com/nextgenhealthcare/connect-examples) for various code templates.
 
-## 2. <a name='OtherprojectsongithubusingMirth'></a>Other projects on github using Mirth?
+## <a name='OtherprojectsongithubusingMirth'></a>Other projects on github using Mirth?
 
 See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in Mirth Slack found useful.
 
-## 3. <a name='WhoiscurrentlysellingANYMirthextensionsorpaidextrasoftware'></a>Who is currently selling ANY Mirth extensions or paid extra software?
+## <a name='WhoiscurrentlysellingANYMirthextensionsorpaidextrasoftware'></a>Who is currently selling ANY Mirth extensions or paid extra software?
 
 23 Jan 2023
 
-* Zen SSL
-* NextGen
-* InterfaceMonitor / xc-monitor
-* MirthSync is on GitHub, is it a freemium model?
+* [Zen SSL](https://consultzen.com/zen-ssl-extension/)
+* [NextGen](https://www.nextgen.com/)
+* [InterfaceMonitor](https://www.interfacemonitor.com/) / [xc-monitor](https://mirth-support.com/xc-monitor)
+* [MirthSync](https://saga-it.com/tech-talk/2019/03/15/mirthsync+installation+and+basic+usage) is [on GitHub](https://github.com/SagaHealthcareIT/mirthsync), is it a freemium model?
 
-## 4. <a name='HL7tips'></a>HL7 tips
+## Send fileset daily via Mirth
 
-* For escaping rules, see [here](https://docs.intersystems.com/latest/csp/docbook/DocBook.UI.Page.cls?KEY=EHL72_ESCAPE_SEQUENCES) and [here](https://www.hl7plus.com/Help/Notepad/index.html?hl7_escape_rules.htm).
+_Kit_ on 7 March 2023
+is it possible to get Mirth to send the same set of messages every day without using another tool like windows scehuler to do the scheduling?
+So we have a few servers that gets redeployed every day with their sample data getting reset each time.
+I want to be able to send a set of HL7 to some of these servers that will create a bunch of ie. clinic appointments over the next month or so
+so I think ideally I would have a bunch of text files with the messages in them, then each day Mirth would pick them up, go through some transforms etc. to ensure the dates are correct, and then send them onwards
 
-## 5. <a name='EmbedBase64imageintoPDF'></a>Embed Base64 image into PDF
+_pacmano_
+All source connectors that end in “reader” can be scheduled.
+
+_Kit_
+ah ok, so if I set up a file reader to poll once a day, and do not get it to move the files when processing, then it will re-process the same messages every day?
+
+_pacmano_
+yup
+
+## Use Mirth to retrieve a file from S3 bucket
+
+_Felipe Nazal_: Has anyone used Mirth to retrieve a file from S3 bucket without passing secret and access key, because ec2 instance role has already access to S3. I need to do it inside of the transformer, thanks!
+
+_narupley_: The File Reader/Writer supports all of that out of the box, see here for everything we do: [S3Connection.java](https://github.com/nextgenhealthcare/connect/blob/development/server/src/com/mirth/connect/connectors/file/filesystems/S3Connection.java)
+But honestly we're not doing much special, just following the AWS SDK docs
+If you use DefaultCredentialsProvider then that gets you what you want, it'll automatically search for credentials in the standard places like env vars or an ec2 instance role
+Everything you need for connecting to S3 should already be included
+[Developer Guide](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/home.html)
+[S3 package](https://sdk.amazonaws.com/java/api/latest/software/amazon/awssdk/services/s3/package-summary.html)
+You could also just use the internal Mirth Connect classes directly like `var s3Connection = new com.mirth.connect.connectors.file.filesystems.S3Connection(...)`
+
+Though doing that could break your script in the future if we ever change stuff in that class
+
+## Error message related to sourceMap
+
+Error text
+The source map entry "VARNAME" was retrieved from the channel map. This method of retrieval has been deprecated and will soon be removed. Please use sourceMap.get('VARNAME') instead.
+
+Change all $('VARNAME') to sourceMap.get('VARNAME').
+
+This was encountered in v3.12.0, and the error message was seen in the [latest v4.2.0 code](https://github.com/nextgenhealthcare/connect/blob/development/server/src/com/mirth/connect/server/userutil/ChannelMap.java#L74), so upgrades and channel fixes can be independent.
+
+## How do I see the full runtime JS code?
+
+See _odoodo_'s [code comment](https://github.com/nextgenhealthcare/connect/discussions/4847#discussioncomment-2251713).
+
+## My batch processing is slow
+
+_Jon Christian_ has batch file of JSON records using a SFTP reader to channel writer, retaining message order was not required
+
+_jonb_ and _agermano_ tag team
+
+You really need destination queueing so you can multithread this.
+It's waiting for the downstream channel to process before pulling the next message
+
+TL;DR when you do a channel writer the SOURCE connector for the target channel runs in the DESTINATION thread of the caller. So if your target channel is slow, your destination is also slow.
+
+you probably are not utilizing all 10 source threads if your upstream channel is the only thing sending to this one
+
+YOLO. Set queue always and give it like 5-10 threads. Start there. Queue on failure wont queue UNTIL THERE IS A FAILURE.
+You'll still see slowness because your first channel is waiting on your second channel. The second channel is taking ~2 seconds per message. The queue in the first one will clearly demonstrate that. The multithreading may make it "good enough".
+
+if you want 10 threads in the downstream channel, you'll either need to enable the downstream source queue, or use 10 destination threads in the upstream channel
+
+With the source queue on, it will accept messages as fast as it can and distribute them among the source threads you have defined. With the source queue off, the 10 threads will be a maximum, but if there are only 5 threads sending messages synchronously, then it will only be using 5/10 threads at a time.
+
+Either option should allow the file reader to generate the messages much faster without waiting for the previous message to process
+
+## Return an HTTP response from a source filter
+
+_chris_
+I have an HTTP listener and I'm adding a source Filter. Can I return an HTTP response from the filter itself?
+
+The current response is coming from the one-and-only-one Destination.
+
+<https://forums.mirthproject.io/forum/mirth-connect/support/18611-custom-response-message-creation-after-source-filter-step-itself>
+Looks promising.
+
+It looks like I can use the post-processor to select between two different responses: either one triggered by the source-filter (stuff something into the channelMap?) or by returning the destination's usual response. How do I say "give me the destination's response" in the post-processor??
+
+_pacmano_
+Building \$r as the message traverses the channel and responding with that (via respond from drop down) seems the most intuitive to me.    Alternatively building a \$c var and returning that in the postprocessor is another option (picking post processor in drop down).
+
+_chris_
+So, tell the channel I want to use $foo as my response and just set \$foo in either the source filter OR the destination?
+That's cool and easy.
+Which map do I want to use for that purpose?
+channelMap?
+
+_pacmano_
+\$c works.   \$r is intended for that purpose of course and is visible on the respond from drop down.  
+
+_chris_
+Is the responseMap visible from the source transformer?
+Looks like the answer is "yes".
+
+## <a name='HL7tips'></a>HL7 tips
+
+### Escaping rules
+
+See [here](https://docs.intersystems.com/latest/csp/docbook/DocBook.UI.Page.cls?KEY=EHL72_ESCAPE_SEQUENCES) and [here](https://www.hl7plus.com/Help/Notepad/index.html?hl7_escape_rules.htm).
+
+### Merging HL7 subcomponent text
+
+Originator: _Anibal Jodorcovsky_, March 2023
+
+His client is sending this faulty data, and while they're tasked with fixing, he is providing an interim solution.
+
+I have somebody sending me "invalid" HL7 with & in one of the segments. ORC-8.1 is this "Printset: CTA HEAD & NECK W/CONTRAST". So, when I extract `msg['ORC']['ORC.8']['ORC.8.1']` I get this `<ORC.8><ORC.8.1><ORC.8.1.1>Printset: CTA HEAD </ORC.8.1.1><ORC.8.1.2> NECK W/CONTRAST</ORC.8.1.2></ORC.8.1></ORC.8>`.  I want to be able to obtain the string `Printset: CTA HEAD & NECK W/CONTRAST`.
+
+_chris_ IMO best place to do this is in the preprocessor. Just look for that exact string and replace it.
+
+_MikeH_ with the link to [this gist](https://github.com/nextgenhealthcare/connect-examples/tree/master/Code%20Templates/Join%20HL7%20Subcomponents) and the following:
+
+````javascript
+//example usage
+msg['OBR']['OBR.4']['OBR.4.2'] = joinSubcomponents(msg['OBR']['OBR.4']['OBR.4.2'],'&').replace("&","\\t\\")
+````
+
+Essentially:
+
+* Get the contents of your field into a string
+* Replace the ampersand with the appropriate HL7 substitution
+* Save the updated string back to the msg
+
+### Deleting from XMLLists
+
+_Jarrod_: anyone delete from a 'for each'?
+I normally have to have a counter to do it and I want to know if there is another way.
+works: `delete ['OBX'][3]`
+does not work:
+
+````javascript
+for each(obx in msg..OBX)
+{
+   delete obx;
+}
+````
+
+_pacmano_
+If xml/hl7 I delete via for loop in reverse order.
+deleting a segment messes up the array offset which does not happen if you do it in reverse order
+
+_agermano_
+
+````javascript
+for each (var obx in msg.OBX) {
+  if (condition) {
+    delete obx[0]
+  }
+}
+````
+
+Without the index you are deleting the reference to the xml object. With the index tells it to delete from the object to which obx refers.
+you don't need a counter, just always use index 0 in the for each loop, and it will delete the current object
+because e4x is weird
+e4x intentionally blurs the line between a single object, and a list with a single element
+it also does a lot of magic so when you delete an element from a document, it automatically reindexes all of the other children so as to not leave any gaps
+if you have a javascript `array [1,2,3,4,5]`, and you `delete array[1]`, you'll end up with `[1,undefined,3,4,5]`
+e4x will shift everything following the deleted element to the left, though
+and in e4x, each element is aware of its position in the parent node
+which can be used via xmlNode.childIndex()
+those child indexes all get updated after a delete (which is part of the reason e4x is slow with large documents)
+if you're deleting in an indexed for loop, it's definitely better to start from the back and work forward
+otherwise you need to decrement your index after you delete so that when it increments at the end of the loop it reads the same element (due to the left shift thing that happens)
+in a normal javascript array it's better to just use a filter rather than delete in a for loop
+I did make an xml filter function that could work here, too. I always try to avoid deletes.
+[Connect Example - Filter XMLLists](https://github.com/nextgenhealthcare/connect-examples/tree/master/Code%20Templates/Filter%20XMLLists)
+If all of your OBX segments are contiguous, you can use this
+`msg.OBX = xFilter(msg.OBX, obx => condition)`
+it's one of the few functions I have in my global code template library
+
+## Polling issue when using clustering plugin
+
+_Zubcy_ 1 March 2023
+Team, Is there anyway to automatically reprocess the last message, whenever the channel is deployed? Not involving any polling functionalities.
+I have a polling channel where I have placed all my global Maps.. I have issues with Clustering plugin, for polling issues. Due to the issue, the channel is not polled after a server restart, hence the global maps are not withstanding a server restart.  I need something which can trigger that channel once it is deployed..
+I need something which can automatically reprocess the last message, when the server goes down in non support times..
+Its set to Poll on start, but as I said, we are using clustering plugin and can set only one node for polling in advanced clustering settings.. hence the nodes which have polling not enabled in advanced clustering settings, are not polling once they are started.
+
+_joshm_
+You could add code in your deploy script that calls the API(s) needed to do it. But there’s no GUI with a setting somewhere that would automatically do that.
+
+_jonb_
+For your original idea - I wouldn’t call the HTTP API. I would call the internal APIs. It could be as simple as doing router.routeMessage() to your channel or as complicated as calling ChannelController to pop a new message in
+
+## Reattach a message when it's reprocessed
+
+_Zivan_ 1 March 2023: I ran into a strange issue while trying to reprocess a message with an attachment using the Interoperability Connector.
+
+_jonb_ [Doco](https://docs.nextgen.com/bundle/Connect_Interoperability_Connector_Suite_User_Guide/page/connect/connect/topics/c_handling_multipart_payloads_attachments_Interop.html)
+
+_agermano_ and _narupley_ In the case of this connector, it's probably not reconstructing the original multipart message so that it can be torn apart again by the connector since the needed information isn't in the source raw data.
+When reprocessing it should "reattach" any attachments
+So the message goes into the channel as it was originally received
+But that's only if those attachment tokens are in the message
+This is an improvement that can/should be made
+The internal controller should not only do that, but possibly also just send any lingering attachments as straight attachments along with the incoming RawMessage object
+The core "issue" is really just a feature enhancement: There is not currently an option to also store original attachments along with a new message when you're reprocessing.
+Reprocessing will "reattach" any attachment content into the raw input though, but only if you have those attachment tokens in the input, like \$\{ATTACH:4651f9e5-802b-40bf-9c93-b5b20aae975d\}
+I suppose in this case, Jon is right that it's specific to the Interop connectors, because it's a case where the attachments are not extracted from the inbound message. Rather they come externally via the MTOM payload -- the SOAP part is used for the inbound message and then any other parts are stored separately as attachments
+Technically you could do the same if you are manually routing messages via JavaScript, because you can include attachments in the RawMessage object
+In most cases you have an inbound message, and your channel's attachment handler will extract whatever attachments it needs to, replacing them with those special \$\{ATTACH\} tokens. Then if you reprocess, it reconstructs the original inbound message first by replacing the ${ATTACH} tokens with the actual content. Then it gets sent to the channel (and probably gets extracted again, as a new attachment for that new message).
+In the case of the interop connectors there's no way to reconstruct the original MTOM payload though, nor would that even make sense, because when you reprocess a message in the UI, it's not flowing through the source connector's receiver endpoint, like you're not sending data through the listening HTTP or TCP port or whatever, you're just sending a message directly to the channel.
+I suppose maybe what reprocess should do is detect which attachments were actually reattached into the inbound data, and any attachments that were not reattached should just be sent along with the RawMessage object as Attachments to store along with the new message.
+If you consider the goal of reprocessing to "send the same message with the same original state/data, as much as possible", then it's currently not meeting that goal when it comes to Interop Connector messages that have MTOM attachments, so in that sense yeah maybe it's a defect
+It would also be true for any attachment handlers that remove content from the message and don't replace that content with a token referencing the exact content that was removed.
+
+_narupley_ continues
+There's not really any good way to do it right now, only kind of hacky ways. But if you reprocess a message (actually reprocess, not double-click and send as a new message), the original ID is sent along with the message. So you can use that to get original attachments if you need them
+
+````javascript
+// Workaround until this is done better in Mirth Connect
+function getOriginalAttachments(base64Decode) {
+ if ($('reprocessed') == true) {
+  var filter = com.mirth.connect.model.filters.MessageFilter();
+  filter.setMinMessageId(connectorMessage.getMessageId());
+  filter.setMaxMessageId(connectorMessage.getMessageId());
+  var messages = com.mirth.connect.server.controllers.ControllerFactory.getFactory().createMessageController().getMessages(filter, channelId, false, 0, 1);
+  if (messages.size() > 0) {
+   var originalId = messages.get(0).getOriginalId();
+   if (originalId) {
+    return AttachmentUtil.getMessageAttachments(channelId, originalId, base64Decode || false);
+   }
+  }
+ }
+
+ // Empty list
+ return Lists.list();
+}
+````
+
+## Skip X rows in a transformer
+
+_daniella_ 1 March 2023
+Issue setting up the transformer steps when processing XML
+
+_agermano_ You can run in batch mode as there is a "number of header records" property so that it doesn't create messages container the column names.
+In this case I'd probably put a javascript step before your iterator with delete msg.row[0]. That should remove the first row from msg, and since you are dealing with xml, it will shift the remaining rows and reindex them. A regular javascript array doesn't do that.
+
+## <a name='EmbedBase64imageintoPDF'></a>Embed Base64 image into PDF
 
 Kicked off by _mkopinsky_ 16 Jan 2023
 
 _agermano_ with all the important bits.
 
-### 5.1. <a name='Option1'></a>Option 1
+### <a name='Option1'></a>Option 1
 
 He recommends Document Writer as "the document writer actually gives you the option of writing to a mirth attachment, which makes it really easy to embed in a second destination".
 
-### 5.2. <a name='Option2'></a>Option 2
+### <a name='Option2'></a>Option 2
 
 "You can use the legacy Flying Saucer and iText libs which are [still included](https://github.com/nextgenhealthcare/connect/tree/4.2.0/server/lib/extensions/doc)". "Data urls work as long as you've registered a url protocol handler for 'data' types".
 
@@ -49,7 +283,7 @@ User can embed
 
 Then set
 
-````
+````text
 -Djava.protocol.handler.pkgs=org.xhtmlrenderer.protocols
 -classpath/a extensions/doc/lib/flying-saucer-core-9.0.1.jar
 ````
@@ -57,18 +291,20 @@ Then set
 _The first line adds the "data" protocol handler to the search path used by the URL class.
 The second line appends the jar to the end of the classpath at startup. This is an option used by the install4j launcher and not directly passed to the jvm_
 
-### 5.3. <a name='Option3'></a>Option 3
+### <a name='Option3'></a>Option 3
 
 Use the newer libraries
 "The main libraries used now are openhtmltopdf running on top of PDFBox 2.x" and the "new lib also supports svg graphics".
 
-## 6. <a name='AccessingHTTPListenerrequestheadersandmetadatasettingcustomresponsecodes'></a>Accessing HTTP Listener request headers and metadata, setting custom response codes
+## <a name='AccessingHTTPListenerrequestheadersandmetadatasettingcustomresponsecodes'></a>Accessing HTTP Listener request headers and metadata, setting custom response codes
 
 See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/10305-access-request-headers-in-http-listener?p=69586#post69586).
 
-## 7. <a name='HashingfilesMD5orother'></a>Hashing files (MD5 or other)
+## <a name='HashingfilesMD5orother'></a>Hashing files (MD5 or other)
 
-See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/13366-md5-hashing?p=81191#post81191) on using Guava. _agermano_: Be sure your RAW content is Base64 decoded before hashing - use either _msg_ or _connectorMessage.getRawData()_.
+See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/13366-md5-hashing?p=81191#post81191) on using Guava.
+
+_agermano_: Be sure your RAW content is Base64 decoded before hashing - use either _msg_ or _connectorMessage.getRawData()_.
 
 _NickT_'s working sample
 
@@ -80,32 +316,32 @@ var hash = hasher.putBytes(decodedData).hash().toString();
 logger.info(hash);
 ````
 
-## 8. <a name='SamplemessagetransformationsfromHL7v2toFHIR'></a>Sample message transformations from HL7v2 to FHIR
+## <a name='SamplemessagetransformationsfromHL7v2toFHIR'></a>Sample message transformations from HL7v2 to FHIR
 
 13 Jan 2023
 _jonb_ recommends [these](https://confluence.hl7.org/display/OO/v2+Sample+Messages).
 
-## 9. <a name='HaveaHTTPListenertorespondwithgzipdata'></a>Have a HTTP Listener to respond with gzip data
+## <a name='HaveaHTTPListenertorespondwithgzipdata'></a>Have a HTTP Listener to respond with gzip data
 
 It's [automatic now](https://forums.mirthproject.io/forum/mirth-connect/support/13156-web-service-and-compress#post80922()) when given the proper request headers.
 
-## 10. <a name='Optiontocheckforduplicatesingiventimeperiod'></a>Option to check for duplicates in given time period
+## <a name='Optiontocheckforduplicatesingiventimeperiod'></a>Option to check for duplicates in given time period
 
 User wants to check for duplicate messages in a given 12 hour period. (11 Jan 2023)
 
 See [_agermano_](<https://forums.mirthproject.io/forum/mirth-connect/support/19116-filter-smtp-destination-unique-only?p=174475#post174475>)'s code snippet using guava which is included with Mirth. Guava allows expiring entries in multiple ways.
 
-## 11. <a name='CanMirthverifycertificatesofexternalparties'></a>Can Mirth verify certificates of external parties?
+## <a name='CanMirthverifycertificatesofexternalparties'></a>Can Mirth verify certificates of external parties?
 
 (Feb 2023) Nothing directly in Mirth.
 
 _chris_: It's very easy to pull a remote cert. Just connect to the service via HTTP and the server will provide it. Then you check it for upcoming expiration. Something like [certcheck](https://github.com/ChristopherSchultz/certcheck) or [check_ssl_cert](https://exchange.nagios.org/directory/Plugins/Network-Protocols/HTTP/check_ssl_cert/details) or [check_ssl_certificate](https://exchange.nagios.org/directory/Plugins/Network-Protocols/HTTP/check_ssl_certificate/details) or [check_http](https://nagios-plugins.org/doc/man/check_http.html).
 
-## 12. <a name='UsingCryptoJSjavascriptlibrary'></a>Using CryptoJS javascript library
+## <a name='UsingCryptoJSjavascriptlibrary'></a>Using CryptoJS javascript library
 
 See [here](https://forums.mirthproject.io/forum/mirth-connect/support/174848-use-require-from-node-js?p=174858#post174858).
 
-## 13. <a name='UsingGPGwithMirth'></a>Using GPG with Mirth
+## <a name='UsingGPGwithMirth'></a>Using GPG with Mirth
 
 12 Jan 2023
 
@@ -115,7 +351,7 @@ For running GPG outside Mirth, use this [code template](https://github.com/nextg
 
 For running within Mirth, you need an additional GPG library, says [here](https://forums.mirthproject.io/forum/mirth-connect/support/13544-can-i-encrypt-a-file-in-gpg-using-mirth). This [wrapper](https://github.com/neuhalje/bouncy-gpg) may be useful, but no one vouched for it.
 
-## 14. <a name='ExpandanattachmentIdreceivedfromanotherchannelsresponsetransformer'></a>Expand an attachmentId received from another channel's response transformer
+## <a name='ExpandanattachmentIdreceivedfromanotherchannelsresponsetransformer'></a>Expand an attachmentId received from another channel's response transformer
 
 _pacmano_'s question and solution 10 Jan 2023
 
@@ -136,12 +372,12 @@ var base64Decode = false;
 var attachmentContent = getAttachment(chanId, messageId,attachmentId,base64Decode).getContentString();
 ````
 
-## 15. <a name='Mirthlicensing'></a>Mirth licensing
+## <a name='Mirthlicensing'></a>Mirth licensing
 
 Q1. Is CURES available under existing licenses or separate from other plugins?
 A1. _Travis West_: "It is separate and requires Gold or Platinum bundles." (Essentially an upcharge in addition to platinum.)
 
-## 16. <a name='minimalexampleusing_JSch_'></a>minimal example using_JSch_
+## <a name='minimalexampleusing_JSch_'></a>Minimal example using JSch
 
 5 Jan 2023 by _joshm_
 
@@ -177,15 +413,15 @@ channel.put(msgBias, UUIDGenerator.getUUID() + '.hl7');
 channel.exit();
 ````
 
-## 17. <a name='Myintegrationof_lodash_isntfunctioningasexpected'></a>My integration of _lodash_ isn't functioning as expected
+## <a name='Myintegrationof_lodash_isntfunctioningasexpected'></a>My integration of _lodash_ isn't functioning as expected
 
 It matters which CDN you download its code from. [This one](https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js) was confirmed to work by _itsjohn_ on 10 Jan 2023.
 
-## 18. <a name='IencounteroddStringandXMLerrorsintermittentlywhensendingbetweenchannels'></a>I encounter odd String and XML errors intermittently when sending between channels
+## <a name='IencounteroddStringandXMLerrorsintermittentlywhensendingbetweenchannels'></a>I encounter odd String and XML errors intermittently when sending between channels
 
 Ensure you do not have a [xalan](https://mvnrepository.com/artifact/xalan/xalan) jar in your custom library. (_rogin_ to fill in what problems were presenting)
 
-## 19. <a name='PerformancemetricsinAWS'></a>Performance metrics in AWS
+## <a name='PerformancemetricsinAWS'></a>Performance metrics in AWS
 
 Seen in 2022
 "Can anyone point me in the direction of documentation/tips around best practice data pruner configuration settings? We have a server with > 1000 channels and millions of messages processed each day. We only store 5 days worth of data on each channel and prune daily, but the data pruner is taking over 32 hours to run with some individual channels taking over 45 minutes to prune about 209k messages and 2million content rows.  Database is MySQL running on an AWS RDS instance.  Is that the best I can expect the pruner to perform?  Am I better off pruning less often even though it will need to churn through more messages per run? Should I be tweaking the block size (currently set at 1000)?  Thanks for any pointers!"
@@ -193,7 +429,7 @@ Seen in 2022
 same person:
 "this instance is running on an AWS c5.12xlarge EC2 instance running linux and pointing to an AWS RDS r5.4xlarge MySQL DB. 1174 deployed channels with varying degrees of volume on them.  The server is mainly receiving messages via TCP and then writing out to a MSSQL DB so not a ton of complicated processing happening within the channels themselves."
 
-## 20. <a name='IncludingsourceChannelIdswhenusingrouter.routeMessage'></a>Including sourceChannelId(s) when using router.routeMessage()
+## <a name='IncludingsourceChannelIdswhenusingrouter.routeMessage'></a>Including sourceChannelId(s) when using router.routeMessage()
 
 2 Jan 2023
 
@@ -226,7 +462,7 @@ message.setSourceMap(attributes);
 router.routeMessage('Test1', message);
 ````
 
-## 21. <a name='EnableJSmaplookupsbuthidethemappedvaluesfromthedashboardview'></a>Enable JS map lookups but hide the mapped values from the dashboard view
+## <a name='EnableJSmaplookupsbuthidethemappedvaluesfromthedashboardview'></a>Enable JS map lookups but hide the mapped values from the dashboard view
 
 An interesting discussion 19 Dec 2022 to generate lookups but omit its confidential values from dashboard view.
 
@@ -239,7 +475,7 @@ var wrapper = Object.create(hm)
 wrapper.toJSON = () => "No peeking!"
 ````
 
-## 22. <a name='UnderstandXMLsnamevslocalName'></a>Understand XML's name() vs localName()
+## <a name='UnderstandXMLsnamevslocalName'></a>Understand XML's name() vs localName()
 
 20 Dec 2022 by _agermano_
 
@@ -274,7 +510,7 @@ js> msg.localName()
 xml
 ````
 
-## 23. <a name='ReturnmultipleobjectsfromaJSreader'></a>Return multiple objects from a JS reader
+## <a name='ReturnmultipleobjectsfromaJSreader'></a>Return multiple objects from a JS reader
 
 _agermano_ 14 Dec 2022
 
@@ -316,7 +552,7 @@ try{
 return resultArray;
 ````
 
-## 24. <a name='ConvertTimestampESTtoPSTwithformatYYYYMMDDhhmmss'></a>Convert Timestamp EST to PST with format YYYYMMDDhhmmss
+## <a name='ConvertTimestampESTtoPSTwithformatYYYYMMDDhhmmss'></a>Convert Timestamp EST to PST with format YYYYMMDDhhmmss
 
 Conversation on 5 Dec 2022 by _Anibal Jodorcovsky_
 
@@ -344,7 +580,7 @@ const zonedDateTime = ZonedDateTime.parse(msg.approvedDT, parseFmt).withZoneSame
 const appDtStr = String(zonedDateTime.format(writeFmt))
 ````
 
-## 25. <a name='Auto-generatevalueforMSH.10'></a>Auto-generate value for MSH.10
+## <a name='Auto-generatevalueforMSH.10'></a>Auto-generate value for MSH.10
 
 Initiator: Nathan Corron
 anyone know if there is a function in mirth to get an incrementing unique number that could be used for say MSH-10?  Needs to be numeric
@@ -374,20 +610,21 @@ _jonb_: other ideas
 _agermano_: like I said, the map[foo] should work in your current mirth version (I've tested it with rhino 1.7.13, but not actually in mirth)
 when map is a java.util.Map
 in prior rhino versions a js object is implemented with NativeObject and a java Map would have been represented by NativeJavaObject (basically a wrapper class.) rhino 1.7.13 introduced NativeJavaMap as a subclass of NativeJavaObject that adds this behavior.
-
-agermano
-  8 minutes ago
 Also NativeJavaList, which allows you to access a java.util.List by index like a js array instead of using the get method.
 
 ## Thread-safety of global map
 
-_chris_ was accessing the global map from channel deployments after noticing values not being in there when they should have been. Ultimately JS should NOT be considered thread-safe. Options listed were replacing the JS map with java.util.ConcurrentHashMap and ...
+_chris_ was accessing the global map from channel deployments after noticing values not being in there when they should have been.
+
+Ultimately JS should NOT be considered thread-safe.
+
+Options listed were replacing the JS map with java.util.ConcurrentHashMap and ...
 "When I create the map initially, I can attach a get method to it which just turns-around and fetches the thing via property-access.
 That will allow me to go and hunt-down all the references in my js code and replace map[foo] with map.get(foo).
 Then I can swap-out the object for the type I really want. In the meantime I still have all kinds of concurrency issues, but I don't have to stop-the-world to re-write all that code.
 Yep, looks like object.get doesn't exist and defining it works as expected."
 
-## 26. <a name='Channeldeploymenttips'></a>Channel deployment tips
+## <a name='Channeldeploymenttips'></a>Channel deployment tips
 
 9 Dec 2022
 Issue: channel changes were not being deployed.
@@ -398,7 +635,7 @@ Solution: Be sure to undeploy the channel first as it resolved his issue.
 User: messages are sent to the Channel and the channel send the messages to the destination channel. But when i look at the dashboard the Messages and the mappings are blank.
 Solution: Review your 'message storage' and 'message pruning' configuration - perhaps it is set to remove content on completion.
 
-## 27. <a name='Channeldevelopmenttips'></a>Channel development tips
+## <a name='Channeldevelopmenttips'></a>Channel development tips
 
 * Set your response data type to RAW. That will force your response transformer code to always execute no matter what. (_joshm_ 7 Dec 2022)
 ** user's code to error after X send attempts was failing, needed the above [to resolve](https://github.com/nextgenhealthcare/connect/discussions/4795). (29 Dec 2022)
@@ -417,7 +654,7 @@ For #2 and #3 above, whether you use the source filter or destinationSet.removeA
 * _agermano_: for RAW messages, msg will be a java string and connectorMessage.getRawData() will be a javascript string
 * _jonb_: (Regarding file hashing) With HL7 you can have things where two messages are the same except for the MSH header information. So the hash should compute on segments other than MSH to really detect duplicates.
 
-### 27.1. <a name='Channelnamingconventions'></a>Channel naming conventions
+### <a name='Channelnamingconventions'></a>Channel naming conventions
 
 Initiator: Rodger Glenn, 2 Dec 2022
 
@@ -438,19 +675,19 @@ SITECODE_function. If multitenant EHRBRAND_function. and USE TAGS FOR PORTS as c
 _Michael Hobbs_:
 I like to also start any channel that listens on a port with said port number. Then if I need I can click the channel view and sort by name.
 
-## 28. <a name='Messagesearchingtips'></a>Message searching tips
+## <a name='Messagesearchingtips'></a>Message searching tips
 
 * Set "page size" to 1 to greatly speed up queries you expect to contain only one result. (_pacmano_ 7 Dec 2022)
 
-## 29. <a name='Createindexonmetadatacolumns'></a>Create index on metadata column(s)
+## <a name='Createindexonmetadatacolumns'></a>Create index on metadata column(s)
 
 By default, indices are not created for metadata columns.
 
-### 29.1. <a name='Option1-1'></a>Option #1
+### <a name='Option1-1'></a>Option #1
 
 _jonb_'s [gist](https://gist.github.com/jonbartels/38ffbb101ea32f981cc9950a21ec6809)
 
-### 29.2. <a name='Option2-1'></a>Option #2
+### <a name='Option2-1'></a>Option #2
 
 _Michael Hobbs_' solution
 [DBConnection.js](DBConnection.js) needed for ChannelUtils
@@ -473,12 +710,15 @@ const messages = ChannelUtils.getMessageByIndexV2({
     })
 ````
 
-## 30. <a name='WhatdoesMirthencrypt'></a>What does Mirth encrypt?
+## <a name='WhatdoesMirthencrypt'></a>What does Mirth encrypt?
+
+Jan 2023 timeframe
 
 _chris_: Does anyone know exactly what Mirth encrypts when you enable "Encryption" for a channel?
-???
 
-## 31. <a name='whydoIseedxxsetinresponseMapwithintheSourcemappings'></a>why do I see 'dxx' set in responseMap within the Source mappings?
+(nothing back yet that he wanted to preserve here)
+
+## <a name='whydoIseedxxsetinresponseMapwithintheSourcemappings'></a>Why do I see 'dxx' set in responseMap within the Source mappings?
 
 Either a bug in the Mirth queries for map data, or perhaps it's the order of operations:
 
@@ -491,23 +731,23 @@ Either a bug in the Mirth queries for map data, or perhaps it's the order of ope
 1. Destination Chain completes
 1. Source looks at response map and sends responseMsg as a reply
 
-## 32. <a name='RhinoshellforMirthConnect'></a>Rhino shell for Mirth Connect
+## <a name='RhinoshellforMirthConnect'></a>Access Rhino shell used by Mirth Connect
 
 Outlined by [_jonb_](https://gist.github.com/jonbartels/d8a1b789dd251e30c4a74baac3a3957a).
 
-## 33. <a name='CanMirthprovideadailyvolumereport'></a>Can Mirth provide a daily volume report?
+## <a name='CanMirthprovideadailyvolumereport'></a>Can Mirth provide a daily volume report?
 
 See _jonb_'s [SQL](https://gist.github.com/jonbartels/b961574b2043b628f1b0fd96f440179b).
 
-## 34. <a name='CommonMirthneeds'></a>Common Mirth needs
+## <a name='CommonMirthneeds'></a>Common Mirth needs
 
-### 34.1. <a name='Extractingazipfle'></a>Extracting a zip fle
+### <a name='Extractingazipfle'></a>Extracting a zip fle
 
 See [forum](https://forums.mirthproject.io/forum/mirth-connect/support/15433-unzipping-files-in-mirth)
 
-## 35. <a name='SimplifiedJavascript'></a>Simplified Javascript
+## <a name='SimplifiedJavascript'></a>Simplified Javascript
 
-### 35.1. <a name='FormatStringthatmaycontainadecimal'></a>Format String that may contain a decimal
+### <a name='FormatStringthatmaycontainadecimal'></a>Format String that may contain a decimal
 
 _joshm_: take a string representation of a number that may or may not have decimals already and force it to be 2 decimal places (i.e 35 or 35.00 should both end up as 35.00)
 
@@ -517,14 +757,14 @@ Both _agermano_ and _Andy Murray_
 parseFloat(str).toFixed(2)
 ````
 
-_joshm_ found fiddled a Java option
+_joshm_ fiddled a Java alternative
 
 ````javascript
 var df = new java.text.DecimalFormat("0.00##");
 return df.format(sumOfCharges);
 ````
 
-## 36. <a name='AddHL7fieldsoutoforder'></a>Add HL7 fields out of order
+## <a name='AddHL7fieldsoutoforder'></a>Add HL7 fields out of order
 
 [FixHL7NodeOrder.js](FixHL7NodeOrder.js) copied from [this comment](https://github.com/nextgenhealthcare/connect/issues/633#issuecomment-626857519)
 
@@ -534,7 +774,7 @@ Usage example
 msg = fixHL7NodeOrder(msg);
 ````
 
-## 37. <a name='ChannelstatsmissingafterDBmigration'></a>Channel stats missing after DB migration
+## <a name='ChannelstatsmissingafterDBmigration'></a>Channel stats missing after DB migration
 
 Initiator: _Bhushan U_ on 14 Nov 2022
 Solution provider: _agermano_
@@ -543,10 +783,10 @@ Hello Team, I need some advice on migrating mirthconnect application with local 
 So far I did postgres database backup and restore plus mirthconnect configuration files backup and restore. But there is still some discrepancy between new server and old server.
 
 Issue: channels stats not showing up after postgres database backup and restore then configuration files backup and restore
-Reason: channels statistics are saved per server\.id
+Reason: channels statistics are saved per server ID
 Solution: Update the current server\'s ID to that of the original server. See [user guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_41/page/connect/connect/topics/c_Application_Data_Directory_connect_ug.html) for details.
 
-## 38. <a name='Case-insensitiveJSONfields'></a>Case-insensitive JSON fields
+## <a name='Case-insensitiveJSONfields'></a>Case-insensitive JSON fields
 
 Initiator:
 _itsjohn_: Hi All, Is there. a way to make JSON payload fields case insensitive when mapping in Mirth so I can write msg['foo'] and Mirth accepts {"foo":""}, {"FOO":""} and {"Foo":""}
@@ -569,11 +809,11 @@ msg.baz.sandwich = 4;
 JSON.stringify(msg);
 ```
 
-## 39. <a name='Migratefile-backedconfigmapintoMirthDB'></a>Migrate file-backed config map into Mirth DB
+## <a name='Migratefile-backedconfigmapintoMirthDB'></a>Migrate file-backed config map into Mirth DB
 
 See [_jonb_'s gist](<https://gist.github.com/jonbartels/4c4e0320f5596645b32bb1c38ac2d9c3>).
 
-## 40. <a name='Comparerunningchannelsagainstamasterlist'></a>Compare running channels against a master list
+## <a name='Comparerunningchannelsagainstamasterlist'></a>Compare running channels against a master list
 
 This produces a list of key, pairs for channels and state. Run it on a polling channel to see what's running and compare it to a master list of what should be running. If the lists don't match, fire an alert of your choosing.
 
@@ -597,13 +837,17 @@ var sourceTry = JSON.stringify(channelStatus);
 $c("SourceTry",sourceTry);
 ````
 
-## 41. <a name='GroupandSumusingJS'></a>Group and Sum using JS
+## <a name='GroupandSumusingJS'></a>Group and Sum using JS
 
 _nafwa03_ on 17 Nov 2022
 
 _nafwa03_'s commentary:
-It\'s a super super useful code snippet. If you have to group and sum some json, you just use it like
+It's a super super useful code snippet. If you have to group and sum some json, you just use it like
+
+````javascript
 var group = groupAndSum(formattedJSON, ['Office', 'Practitioner', 'PreviousBalance', 'PaymentsThisPeriod'],['Charges']);
+````
+
 I recently had some json to aggregate and by passing in the keys this handles it really well
 
 ````javascript
@@ -657,7 +901,7 @@ function groupAndSum(arr, groupByKeys, sumKeys) {
 }
 ````
 
-## 42. <a name='Improvedchannelcloning'></a>Improved channel cloning
+## <a name='Improvedchannelcloning'></a>Improved channel cloning
 
 [Archived link](https://mirthconnect.slack.com/archives/C02SW0K4D/p1668089121891089)
 _Chris_: Before my upgrade from 3.8.0 -> 4.1.1, I had a channel which I used to create other channels from templates. It clones the channel and then makes sure that various Code Template Libraries are copied along with them, and tags, too, since "channel clone" is IMO incomplete because it skips those things.
@@ -679,11 +923,11 @@ setChannelLibrariesByName(createdChannelIds, ['Shared Integration', 'EHR Stuff']
 setChannelGroupByName(createdChannelIds, 'PCC Practices', serverEventContext);
 ````
 
-## 43. <a name='WhatisthelayoutofaMirthdatabase'></a>What is the layout of a Mirth database?
+## <a name='WhatisthelayoutofaMirthdatabase'></a>What is the layout of a Mirth database?
 
 See [this ER diagram](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png).
 
-## 44. <a name='Calculateaverageresponsetimeforagivenchannelsmessages'></a>Calculate average response time for a given channel's messages
+## <a name='Calculateaverageresponsetimeforagivenchannelsmessages'></a>Calculate average response time for a given channel's messages
 
 ````sql
 with started as (select message_id, received_date from d_mm388 where connector_name = 'Source'),
@@ -704,13 +948,13 @@ Given a JS reader, I want to return one message for many rows using a JS DB quer
 
 _narupley_: The Database Reader will do that automatically for you if you have the Aggregate Results option enabled. If you're in JavaScript mode, then you can return either a ResultSet or a List of Maps.
 
-## 45. <a name='ReportonSSLCertificateUsage'></a>Report on SSL certificate usage
+## <a name='ReportonSSLCertificateUsage'></a>Report on SSL certificate usage
 
 _jonb_ rediscovering his own gist - "Is there a report for the NG SSL Manager that shows what channels are using a particular certificate?"
 
 See [_jonb_'s gist](https://gist.github.com/jonbartels/f99d08208a0e880e2cee160262dda4c8).
 
-## 46. <a name='ReadandmapMirthlicensingdata'></a>Read and map Mirth licensing data
+## <a name='ReadandmapMirthlicensingdata'></a>Read and map Mirth licensing data
 
 _jonb_ on 6 Oct 2022, seems to be a repost of an archived message.
 
@@ -744,7 +988,7 @@ from almost_there
 order by lastValidation ASC;
 ````
 
-## 47. <a name='Prunemessageswhileavoidingerroredmessages'></a>Prune messages while avoiding errored messages
+## <a name='Prunemessageswhileavoidingerroredmessages'></a>Prune messages while avoiding errored messages
 
 2 Sept 2022
 Commenter:
