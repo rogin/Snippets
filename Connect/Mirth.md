@@ -21,6 +21,199 @@ See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in
 * [InterfaceMonitor](https://www.interfacemonitor.com/) / [xc-monitor](https://mirth-support.com/xc-monitor)
 * [MirthSync](https://saga-it.com/tech-talk/2019/03/15/mirthsync+installation+and+basic+usage) is [on GitHub](https://github.com/SagaHealthcareIT/mirthsync), is it a freemium model?
 
+## What was included in the MCAL v1.3.1 release?
+
+_narupley_: new code signing cert that is baked into the launcher, that's it
+
+## Details on the Thread Assignment Variable
+
+See [here](https://github.com/nextgenhealthcare/connect/discussions/5698).
+
+## Updating legacy Mirth forum links
+
+_jonb_: Given __<https://www.mirthcorp.com/community/forums>__/showthread.php?t=8783, replace with __<https://forums.mirthproject.io>__/showthread.php?t=8783
+
+## S3 connectivity example
+
+Initiated by _Gio_ using v1 of the AWS Java SDK
+
+````javascript
+var awsProfile = new Packages.com.amazonaws.auth.InstanceProfileCredentialsProvider();
+var s3client = new Packages.com.amazonaws.services.s3.AmazonS3Client(awsProfile);
+````
+
+He didn't need accesskey nor secretkey as he's using ec2Role.
+
+_joshm_
+use the built-in S3 packages (v2.x) which changed the full package names. you don’t need external jars. You would just want to replace your credentials provider class
+
+````javascript
+function getS3Client2(){
+
+ var software = Packages.software;
+ var region = software.amazon.awssdk.regions.Region.US_EAST_2;
+ var awsCreds = software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create($cfg("AwsAccessKeyId"),$cfg("AwsSecretAccessKey"));
+
+ var s3 = software.amazon.awssdk.services.s3.S3Client.builder()
+  .region(region)
+  .credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(awsCreds))
+  .build();
+
+ return s3;
+}
+````
+
+When using ec2Role:
+
+````javascript
+//set region where AWS bucket lives
+region = Packages.software.amazon.awssdk.regions.Region.US_EAST_2;
+//configure s3Client
+var s3Client = Packages.software.amazon.awssdk.services.s3.S3Client.builder().region(region).build();
+
+getObjectRequest = Packages.software.amazon.awssdk.services.s3.model.GetObjectRequest.builder().bucket(bucketName).key(objectKey).build();
+//you may want to omit asUtf8String() to access the bytes directly
+messageContent = s3Client.getObjectAsBytes(getObjectRequest).asUtf8String();
+````
+
+## Exporting DICOM images
+
+_Gio_
+Do we know why this happens? "Error: Cannot export DICOM attachments."
+when I try to open the attachment it works
+
+_pacmano_
+from source code, exporting appears to be unsupported.
+I think it's because the dicom attachment is not the full dicom message, but only the extracted pixel data
+
+_jonb_
+The [export](https://github.com/nextgenhealthcare/connect/blob/b3bd6308b789d16e4b562bd5686cef883fa1faf1/client/src/com/mirth/connect/client/ui/AttachmentExportDialog.java#L171) method
+
+````java
+if (StringUtils.isBlank(fileField.getText())) {
+    PlatformUI.MIRTH_FRAME.alertError(this, "Please fill in required fields.");
+    fileField.setBackground(UIConstants.INVALID_COLOR);
+    return;
+}
+````
+
+If you lie to MC about the attachment MIME type it will export
+ahh worst case use JS and copy the attachment and change the mime type on the copy.
+`SELECT * FROM d_maXX where id = YYY` would do too.
+
+## Ensuring a HTTP sender destination hits the http server in order of the queue
+
+_Craig A_
+How can i ensure that my HTTP sender destination hits the http server in order of the queue
+in my screenshot, actionkey is in numeric order. but when I look on my http server logs. messages are processing out of order (because a message might take longer than others, and mirth has already done the next call before the previous one has finished)
+
+_jonb_
+[Conversation](https://mirthconnect.slack.com/archives/C02SW0K4D/p1678282342826799) from earlier this morning. I think it is a different problem but read that thread first. It’s a fresh question and might be related.
+Enabling queueing will make message ordering LESS likely to work.
+
+_narupley_
+As long as your Queue Threads are set to 1 (and you don't have Rotate turned on), then the queue is always guaranteed to process in order.
+From the perspective of Mirth Connect, everything is sending in order, it's sending the HTTP request and getting the successful (200 or whatever) response and moving on
+If the remote server is processing out of order still, then that means the issue lies with that remote server, not with Mirth Connect. That server might be set up with its own parallelization such that a 200 response might be sent back immediately and then processing happens asynchronously, similar to how the Source Queue works in MC
+Ah okay, so you don't have the queue enabled, however you do have your Max Processing Threads set to 6
+That is why.
+Your channel is processing received messages in parallel
+By default that is set to 1, meaning that only 1 message can process through a channel at any time
+However, note that if you set that back to 1, then that will push the elapsed time up a level, to the upstream channel that is sending to that Channel Reader
+Since you're not sending back a response in the source settings anyway,
+You could just enable queuing on your HTTP Sender destination there
+
+_Jarrod_
+Would it make sense to set respond before processing
+
+_narupley_
+Not for his use-case, because he has the Max Processing Threads set to 6 (presumably so that multiple upstream channels/threads can send messages to that channel at the same time).
+If you enable the Source Queue, then it's going to use 6 queue threads, whatever Max Processing Threads is set to.
+He could enable the Source Queue and turn the Max Processing Threads down to 1 though, and that would be functionally similar, but only if that channel doesn't have any preprocessor/filter/transformer/postprocessor scripts that he wants to have parallelized too.
+
+## Message order issue when using GMO and Advanced Clustering plugin
+
+_Zubcy_
+Hi Guys, Mirth is getting responses earlier for the latter messages.. i.e its not waiting for current message response, before sending the next message.. How to fix this?
+113124 is the first message, but it received response at 080 ms...113125 is the later message, but response is early at 017 ms.. I dont think its good, as Mirth must not send another message, before it receives the current response, right?
+
+Setup
+
+* PostGres
+* Guaranteed Message Order (GMO) is on
+* Using Advanced Cluster plugin
+* When GMO is disabled, I get correct responses.
+
+_jonb_
+queues are on. Queues are designed to handle multiple messages at once in separate threads
+
+_joshm_
+it can absolutely send another message if the other is waiting on a response.
+Is advanced clustering also enabled? That may also play into it
+with queues enabled, won’t it get a message status of QUEUED immediately and move on?
+
+_agermano_
+Yes, but it should still maintain message order
+I don't have the clustering plugin. With GMO, does the plugin force one node to process all messages or is it possible that those messages were processed by two different nodes with slightly off clocks?
+The destination is also set to queue on failure, so most of the time the queue probably isn't doing anything
+
+_Zubcy_
+@agermano Yes, with GMO on, the plugin forces one node to process all messages.. Also, regarding time, I checked all nodes, the time is the same...
+
+_jonb_
+@joshm its queue on fail
+
+_Zubcy_
+@joshm Can I have a setting where Mirth doesn't send next message, until it gets its response..
+
+_agermano_
+What were the number of send attempts for the two messages you showed?
+
+_Zubcy_
+Zero, there were no retries
+
+_agermano_
+What does that "use single cluster node" setting do in the destination queue settings?
+Is there a way in the message browser to verify both messages processed on the same node?
+You have it set to no, which says message order is not guaranteed
+
+_Zubcy_
+Yes, I verified them in receiving application database, they were processed from same node
+
+_agermano_
+I think maybe you want "use source setting"
+
+_Zubcy_
+I have used all the 3 settings, but still the same issue
+
+_agermano_
+Maybe change it to queue always instead of on failure? To ensure the same destination thread is always processing messages?
+It's probably worth opening a support ticket, as it seems to have something to do with the plugin and the GMO setting.
+
+_chris_
+There's only one thread. Doesn't that mean that message-order is always guaranteed? My experience is that queuing ends up queuing everything and pounding on a single message until it either is successful or goes into an ERROR state. If you have queue-on-error, then ERROR goes back into the queue and your message-delivery grinds to a halt.
+
+## Diagram channel dependencies
+
+_Richard_
+is there a script lying around that helps map channel dependencies with info on queue settings and thread counts? a nice diagram showing where their pipes are fat or potentially too tiny would be useful.
+
+_jonb_
+NextGen, Zen, and I think maybe Diridium and Innovar all have some health-check type offerings. Obviously geared towards finding how their services can help you. The NG offering might have been free if you upload the server config but I don’t recall the details.
+In the guts of the DB you’d be querying against the channel table then doing xml parsing of the connector settings.
+Dependencies are in the config table and not persisted with the channel. Again an XML blob to pick apart.
+Its ehhh probably a 3-4 out of 10 level of difficulty
+
+Brainstormed options:
+
+* refactor [this PHP project](https://github.com/TristanChaput/Mirth-Connect-Channel-Report) as a head start
+* get the important XML _jonb_ listed via the existing PS_Mirth project
+* plugin opportunity! If you write it as a client plugin, it would be using the same java objects that the client already has for showing the channel view instead of parsing xml.
+* Doing this as XML -> XSLT -> SVG might be easier than writing it in Java.
+* Not HTML5 directly, but you can do JSON+js in HTML and make graphs.
+* Plotly js is a marvel.
+* javafx can do charts and graphs
+
 ## Send fileset daily via Mirth
 
 _Kit_ on 7 March 2023
@@ -162,7 +355,7 @@ _pacmano_
 If xml/hl7 I delete via for loop in reverse order.
 deleting a segment messes up the array offset which does not happen if you do it in reverse order
 
-_agermano_
+_agermano_:
 
 ````javascript
 for each (var obx in msg.OBX) {
@@ -218,10 +411,10 @@ But that's only if those attachment tokens are in the message
 This is an improvement that can/should be made
 The internal controller should not only do that, but possibly also just send any lingering attachments as straight attachments along with the incoming RawMessage object
 The core "issue" is really just a feature enhancement: There is not currently an option to also store original attachments along with a new message when you're reprocessing.
-Reprocessing will "reattach" any attachment content into the raw input though, but only if you have those attachment tokens in the input, like \$\{ATTACH:4651f9e5-802b-40bf-9c93-b5b20aae975d\}
+Reprocessing will "reattach" any attachment content into the raw input though, but only if you have those attachment tokens in the input, like `${ATTACH:4651f9e5-802b-40bf-9c93-b5b20aae975d}`
 I suppose in this case, Jon is right that it's specific to the Interop connectors, because it's a case where the attachments are not extracted from the inbound message. Rather they come externally via the MTOM payload -- the SOAP part is used for the inbound message and then any other parts are stored separately as attachments
 Technically you could do the same if you are manually routing messages via JavaScript, because you can include attachments in the RawMessage object
-In most cases you have an inbound message, and your channel's attachment handler will extract whatever attachments it needs to, replacing them with those special \$\{ATTACH\} tokens. Then if you reprocess, it reconstructs the original inbound message first by replacing the ${ATTACH} tokens with the actual content. Then it gets sent to the channel (and probably gets extracted again, as a new attachment for that new message).
+In most cases you have an inbound message, and your channel's attachment handler will extract whatever attachments it needs to, replacing them with those special `${ATTACH}` tokens. Then if you reprocess, it reconstructs the original inbound message first by replacing the `${ATTACH}` tokens with the actual content. Then it gets sent to the channel (and probably gets extracted again, as a new attachment for that new message).
 In the case of the interop connectors there's no way to reconstruct the original MTOM payload though, nor would that even make sense, because when you reprocess a message in the UI, it's not flowing through the source connector's receiver endpoint, like you're not sending data through the listening HTTP or TCP port or whatever, you're just sending a message directly to the channel.
 I suppose maybe what reprocess should do is detect which attachments were actually reattached into the inbound data, and any attachments that were not reattached should just be sent along with the RawMessage object as Attachments to store along with the new message.
 If you consider the goal of reprocessing to "send the same message with the same original state/data, as much as possible", then it's currently not meeting that goal when it comes to Interop Connector messages that have MTOM attachments, so in that sense yeah maybe it's a defect
