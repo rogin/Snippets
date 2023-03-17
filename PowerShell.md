@@ -4,9 +4,21 @@
 
 See [here](https://github.com/stars/rogin/lists/rust).
 
-## Converting to int and string
+## Tracing commands
 
-Examples from [here](https://hostingultraso.com/help/windows/convert-numbers-between-bases-windows-powershell)
+Use [_trace-command_](https://learn.microsoft.com/en-us/powershell/module/Microsoft.PowerShell.Utility/Trace-Command?view=powershell-7.3)
+
+````powershell
+trace-command -expression {"g*","s*" | Get-Alias } -name parameterbinding -pshost
+#to see all options for -name above
+Get-TraceSource
+````
+
+## Simple things I forget
+
+### Converting to int and string
+
+Examples from [here](https://hostingultraso.com/help/windows/convert-numbers-between-bases-windows-powershell) making use of `Convert` class:
 
 ````powershell
 # Convert accepts bases 2, 8, 10, and 16
@@ -19,7 +31,62 @@ PS >"{0:X4}" -f 1234
 04D2
 ````
 
-## Using -split with "|"
+### pre-sized arrays
+
+from [here](https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/everything-about-arrays?view=powershell-7.2#initialize-with-0)
+
+````powershell
+PS> [int[]]::new(4)
+0
+0
+0
+0
+#We can use the multiplying trick to do this too.
+PS> $data = @(0) * 4
+PS> $data
+0
+0
+0
+0
+````
+
+### Use Where() to split one collection into two
+
+Where() accepts [multiple params](https://mcpmag.com/articles/2015/12/02/where-method-in-powershell.aspx).
+
+````powershell
+@(1,2,3).Where({$_ -gt 0}, 'first')
+#1
+ @(1,2,3).Where({$_ -gt 0}, 'first', 2)
+#1
+#2
+@(1,2,3).Where({$_ -gt 10}, 'first')
+@(1,2,3).Where({$_ -gt 10}, 'first', 2)
+$Running,$Stopped = (Get-Service).Where({$_.Status -eq 'Running'},'Split') 
+#use $Running and $Stopped
+````
+
+### Here-strings
+
+See [here](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.3#here-strings)
+
+````powershell
+@"
+For help, type "get-help"
+"@
+````
+
+## Gotchas
+
+Various items that have bitten me.
+
+### Pipelined input to my advanced function isn't processing
+
+Verify your code is in a process block. To [quote](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_methods?view=powershell-7.3#process):
+
+_If a function parameter is set to accept pipeline input, and a process block isn't defined, record-by-record processing will fail. In this case, your function will only execute once, regardless of the input._
+
+### Using -split with "|"
 
 Be sure to escape the pipe as it's a special character, or substitute Split() instead.
 
@@ -46,34 +113,49 @@ foo
 bar
 ````
 
-## pre-sized arrays
+## New in PS v7
 
-from [here](https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/everything-about-arrays?view=powershell-7.2#initialize-with-0)
-
-````powershell
-PS> [int[]]::new(4)
-0
-0
-0
-0
-#We can use the multiplying trick to do this too.
-PS> $data = @(0) * 4
-PS> $data
-0
-0
-0
-0
-````
-
-## Tracing commands
-
-Use [_trace-command_](https://learn.microsoft.com/en-us/powershell/module/Microsoft.PowerShell.Utility/Trace-Command?view=powershell-7.3)
+### Ternary
 
 ````powershell
-trace-command -expression {"g*","s*" | Get-Alias } -name parameterbinding -pshost
-#to see all options for -name above
-Get-TraceSource
+$IsWindows ? "ok":"not ok"
 ````
+
+### Chain operators
+
+````powershell
+1 && 2
+1/0 || Write-Warning "What are you trying to do?"
+````
+
+### Null-Coalescing Assignment
+
+````powershell
+$foo = $null
+$foo ?? "bar"
+Related to this is the Null-Coalescing assignment operator, ??=.
+<left-side> ??= <right-side>
+$computername ??= ([system.environment]::MachineName)
+````
+
+### Null Conditional Operators
+
+````powershell
+$p = Get-Process -id $pid
+${p}?.startTime
+````
+
+### ForEach-Object Parallel
+
+````powershell
+Measure-Command {1..1000 | ForEach-Object -parallel {$_*10}}
+````
+
+### SSH for remoting
+
+### Clean block (v7.3+)
+
+Acts like a **finally** block, see [here](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_methods?view=powershell-7.3#clean).
 
 ## Nuggets from "The PowerShell Scripting and Toolmaking Book"
 
@@ -100,67 +182,29 @@ Enter-PSSession -computername $env:COMPUTERNAME -Configuration PowerShell.7
 #endpoint. Now, the scripting panel will be PowerShell 7 “aware”.
 ````
 
-### New in v7
+## Solutions I've needed but came up empty
 
-- Ternary
+- Can I select XML's #text() in a SelectNode()?
+- Can I create a cycled iterator that repeats a list? there's no 'yield' equivalent. I want `('red','green','blue')` to cycle forever.
+- Can I iterate with an index like other languages -- `for (index, value) in list.something()`. There's a [language request ticket](https://github.com/PowerShell/PowerShell/issues/13772) for \$PSIndex that was closed.
 
-````powershell
-$IsWindows ? "ok":"not ok"
-````
+## Review one liners
 
-- Chain operators
+Pull anything of value from [here](https://www.red-gate.com/simple-talk/sysadmin/powershell/powershell-one-liners--collections,-hashtables,-arrays-and-strings/).
 
-````powershell
-1 && 2
-1/0 || Write-Warning "What are you trying to do?"
-````
+## Review operators
 
-- Null-Coalescing Assignment
+Read over the full [page](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_Operators?view=powershell-7.3). The subexpressions were interesting.
 
-````powershell
-$foo = $null
-$foo ?? "bar"
-Related to this is the Null-Coalescing assignment operator, ??=.
-<left-side> ??= <right-side>
-$computername ??= ([system.environment]::MachineName)
-````
+## Range operator
 
-- Null Conditional Operators
-
-````powershell
-$p = Get-Process -id $pid
-${p}?.startTime
-````
-
-- ForEach-Object Parallel
-
-````powershell
-Measure-Command {1..1000 | ForEach-Object -parallel {$_*10}}
-````
-
-- SSH for remoting
-
-## Where() accepts multiple params
-
-See [here](https://mcpmag.com/articles/2015/12/02/where-method-in-powershell.aspx).
-
-````powershell
-@(1,2,3).Where({$_ -gt 0}, 'first')
-#1
- @(1,2,3).Where({$_ -gt 0}, 'first', 2)
-#1
-#2
-@(1,2,3).Where({$_ -gt 10}, 'first')
-@(1,2,3).Where({$_ -gt 10}, 'first', 2)
-$Running,$Stopped = (Get-Service).Where({$_.Status -eq 'Running'},'Split') 
-#use $Running and $Stopped
-````
+See [here](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_Operators?view=powershell-7.3#range-operator-).
 
 ## Helpful links
 
-<https://devblogs.microsoft.com/powershell-community/cheat-sheet-console-experience/>
+[Powershell cheat sheet](https://devblogs.microsoft.com/powershell-community/cheat-sheet-console-experience/)
 
-[Various gotchas](https://github.com/devops-collective-inc/big-book-of-powershell-gotchas/blob/master/SUMMARY.md)
+[Big Book of Powershell Gotchas](https://github.com/devops-collective-inc/big-book-of-powershell-gotchas/blob/master/SUMMARY.md)
 
 [Unit testing vs integration testing](https://www.guru99.com/unit-test-vs-integration-test.html)
 
