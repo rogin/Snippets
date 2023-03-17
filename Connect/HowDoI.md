@@ -150,20 +150,16 @@ The current response is coming from the one-and-only-one Destination.
 It looks like I can use the post-processor to select between two different responses: either one triggered by the source-filter (stuff something into the channelMap?) or by returning the destination's usual response. How do I say "give me the destination's response" in the post-processor??
 
 _pacmano_
-Building \$r as the message traverses the channel and responding with that (via respond from drop down) seems the most intuitive to me.    Alternatively building a \$c var and returning that in the postprocessor is another option (picking post processor in drop down).
+Building `$r` as the message traverses the channel and responding with that (via respond from drop down) seems the most intuitive to me.    Alternatively building a `$c` var and returning that in the postprocessor is another option (picking post processor in drop down).
 
 _chris_
-So, tell the channel I want to use $foo as my response and just set \$foo in either the source filter OR the destination?
-That's cool and easy.
-Which map do I want to use for that purpose?
-channelMap?
+So, tell the channel I want to use `$foo` as my response and just set `$foo` in either the source filter OR the destination? Which map do I want to use for that purpose?
 
 _pacmano_
-\$c works.   \$r is intended for that purpose of course and is visible on the respond from drop down.  
+`$c` works. `$r` is intended for that purpose of course and is visible on the respond from drop down.  
 
 _chris_
-Is the responseMap visible from the source transformer?
-Looks like the answer is "yes".
+Is the responseMap visible from the source transformer? Looks like the answer is "yes".
 
 ## Add HL7 fields out of order
 
@@ -934,3 +930,31 @@ function getOriginalAttachments(base64Decode) {
  return Lists.list();
 }
 ````
+
+## Restore missing channel stats after DB migration
+
+Initiator: _Bhushan U_ on 14 Nov 2022
+Solution provider: _agermano_
+
+Hello Team, I need some advice on migrating mirthconnect application with local postgresql database server from windows 2008 to windows 2012 server.
+So far I did postgres database backup and restore plus mirthconnect configuration files backup and restore. But there is still some discrepancy between new server and old server.
+
+Issue: channels stats not showing up after postgres database backup and restore then configuration files backup and restore
+Reason: channels statistics are saved per server ID
+Solution: Update the current server\'s ID to that of the original server. See [user guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_41/page/connect/connect/topics/c_Application_Data_Directory_connect_ug.html) for details.
+
+## Speed up my slow batch processing
+
+_Jon Christian_ has batch file of JSON records using a SFTP reader to channel writer, retaining message order was not required
+
+_jonb_ and _agermano_ tag team
+
+You really need destination queueing so you can multithread this. It's waiting for the downstream channel to process before pulling the next message. TL;DR when you do a channel writer the SOURCE connector for the target channel runs in the DESTINATION thread of the caller. So if your target channel is slow, your destination is also slow. you probably are not utilizing all 10 source threads if your upstream channel is the only thing sending to this one.
+
+YOLO. Set queue always and give it like 5-10 threads. Start there. Queue on failure wont queue UNTIL THERE IS A FAILURE. You'll still see slowness because your first channel is waiting on your second channel. The second channel is taking ~2 seconds per message. The queue in the first one will clearly demonstrate that. The multithreading may make it "good enough".
+
+if you want 10 threads in the downstream channel, you'll either need to enable the downstream source queue, or use 10 destination threads in the upstream channel.
+
+With the source queue on, it will accept messages as fast as it can and distribute them among the source threads you have defined. With the source queue off, the 10 threads will be a maximum, but if there are only 5 threads sending messages synchronously, then it will only be using 5/10 threads at a time.
+
+Either option should allow the file reader to generate the messages much faster without waiting for the previous message to process.

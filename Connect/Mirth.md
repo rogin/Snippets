@@ -33,41 +33,11 @@ See our [new section](HowDoI.md).
 
 * Read through the [Mirth User Guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_42). It has a Best Practices section which can help your message throughput and minimize DB space.
 
-## Pruning question
+## Pruning logic clarification
 
 _tarmor_: If message has one destination in ERROR status, the purge process will not remove the message. If I search for messages in ERROR status and do "Remove results", it will only remove the destination messages, not the whole message. Will the purge process remove then the source and other destinations, since there is no error anymore?
 
-_jonb_
-[His gist](https://github.com/nextgenhealthcare/connect/blob/b3bd6308b789d16e4b562bd5686cef883fa1faf1/server/dbconf/postgres/postgres-message.xml#L412)
-This is for postgres. You can find sibling files for other DB engines for getMessagesToPrune . MC does a SELECT to find message IDs to remove then it does a second operation to actually delete those messages.
-A [recent release](https://github.com/nextgenhealthcare/connect/milestone/69?closed=1) of MC introduced “prune error” in 3.12.
-I wrote a custom pruner for my employer a few months ago. (_ed note_: stated in March 2023.) I have forgotten a lot of the details but I can find them again if there is sufficient interest.
-
-## Dealing with 'Early EOF' in HTTPReceiver
-
-_RunnenLate_
-anyone know how i can troubleshoot this error, i don't see a single message as error within the channel
-`ERROR  (com.mirth.connect.connectors.http.HttpReceiver:522): Error receiving message (HTTP Listener "Source" on channel 12c72fc1-39f4-4e55-840d-4bdcdb9b328f).
-org.eclipse.jetty.io.EofException: Early EOF`
-the client is trying to send just tons of concurrent connections and it's limited to 10 threads
-
-_tiskinty_
-based on experience, that's usually a network error
-I would guess it's a firewall issue based on the EOF, but that's not a sure thing by any means
-the thread/connection setup doesn't usually cause that from what I've seen before. 99% of the time when I've seen it, it was directly related to a firewall or VPN setup needing to be restarted
-Otherwise, it might be enough (depending on the actual networking setup) to re-deploy the channel. I've seen that work occasionally in the past. I wouldn't bank on it, but it's typically low risk
-
-_RunnenLate_
-no firewall in front of the server, just an F5 which there is no way I would restart
-I told the client to reduce their queue for 9000 to 100 and retry
-
-## JS "Object.values()" throws an error in Mirth
-
-_itsjohn_
-I’m using Object.values() but it throws an error ‘cannot find function values in object function Object ()’.
-
-_Daniel Ruppert_
-The Rhino Engine [doesn't implement](https://forums.mirthproject.io/forum/mirth-connect/support/19120-using-javascript-object-values) that until [v1.7.14](https://github.com/mozilla/rhino/pull/902). A [feature request](https://github.com/nextgenhealthcare/connect/issues/5541) was opened.
+_jonb_'s [gist](https://github.com/nextgenhealthcare/connect/blob/b3bd6308b789d16e4b562bd5686cef883fa1faf1/server/dbconf/postgres/postgres-message.xml#L412). This is for postgres. You can find sibling files for other DB engines for getMessagesToPrune . MC does a SELECT to find message IDs to remove then it does a second operation to actually delete those messages. A [recent release](https://github.com/nextgenhealthcare/connect/milestone/69?closed=1) of MC introduced “prune error” in 3.12. I wrote a custom pruner for my employer a few months ago. (_ed note_: stated in March 2023.) I have forgotten a lot of the details but I can find them again if there is sufficient interest.
 
 ## Advanced Clustering discussion with important bits
 
@@ -98,9 +68,43 @@ agreed, it's not quirk-free... we're trying to decide if we want to keep dual ac
 _Ryan Howk_
 I think we need message order preservation
 
-## Error: “Assignment to lists with more than one item is not supported”
+## Error strings and their solutions
+
+### Error: `Assignment to lists with more than one item is not supported`
 
 See [forum](https://forums.mirthproject.io/forum/mirth-connect/support/16781-): you’re trying to set a repeating segment to a non repeating segment
+
+### JS "Object.values()" throwing
+
+_itsjohn_
+I’m using Object.values() but it throws an error `cannot find function values in object function Object ()`.
+
+_Daniel Ruppert_
+The Rhino Engine [doesn't implement](https://forums.mirthproject.io/forum/mirth-connect/support/19120-using-javascript-object-values) that until [v1.7.14](https://github.com/mozilla/rhino/pull/902). A [feature request](https://github.com/nextgenhealthcare/connect/issues/5541) was opened.
+
+### Accessing sourceMap
+
+Encountered error text:
+`The source map entry "VARNAME" was retrieved from the channel map. This method of retrieval has been deprecated and will soon be removed. Please use sourceMap.get('VARNAME') instead.`
+
+Solution: Change all $('VARNAME') to sourceMap.get('VARNAME').
+
+This was encountered in v3.12.0, and the error message was seen in the [latest v4.2.0 code](https://github.com/nextgenhealthcare/connect/blob/development/server/src/com/mirth/connect/server/userutil/ChannelMap.java#L74), so MC upgrades and channel fixes can be independent.
+
+### Dealing with 'Early EOF' in HTTPReceiver
+
+_RunnenLate_
+anyone know how i can troubleshoot this error, i don't see a single message as error within the channel
+`ERROR  (com.mirth.connect.connectors.http.HttpReceiver:522): Error receiving message (HTTP Listener "Source" on channel 12c72fc1-39f4-4e55-840d-4bdcdb9b328f).
+org.eclipse.jetty.io.EofException: Early EOF`
+the client is trying to send just tons of concurrent connections and it's limited to 10 threads.
+
+_tiskinty_
+based on experience, that's usually a network error. I would guess it's a firewall issue based on the EOF, but that's not a sure thing by any means
+the thread/connection setup doesn't usually cause that from what I've seen before. 99% of the time when I've seen it, it was directly related to a firewall or VPN setup needing to be restarted. Otherwise, it might be enough (depending on the actual networking setup) to re-deploy the channel. I've seen that work occasionally in the past. I wouldn't bank on it, but it's typically low risk
+
+_RunnenLate_
+no firewall in front of the server, just an F5 which there is no way I would restart. I told the client to reduce their queue for 9000 to 100 and retry.
 
 ## What was included in the MCAL v1.3.1 release?
 
@@ -193,37 +197,6 @@ Brainstormed options:
 * Plotly js is a marvel.
 * javafx can do charts and graphs
 
-## Error message related to sourceMap
-
-Encountered error text:
-The source map entry "VARNAME" was retrieved from the channel map. This method of retrieval has been deprecated and will soon be removed. Please use sourceMap.get('VARNAME') instead.
-
-Solution: Change all $('VARNAME') to sourceMap.get('VARNAME').
-
-This was encountered in v3.12.0, and the error message was seen in the [latest v4.2.0 code](https://github.com/nextgenhealthcare/connect/blob/development/server/src/com/mirth/connect/server/userutil/ChannelMap.java#L74), so MC upgrades and channel fixes can be independent.
-
-## My batch processing is slow
-
-_Jon Christian_ has batch file of JSON records using a SFTP reader to channel writer, retaining message order was not required
-
-_jonb_ and _agermano_ tag team
-
-You really need destination queueing so you can multithread this.
-It's waiting for the downstream channel to process before pulling the next message
-
-TL;DR when you do a channel writer the SOURCE connector for the target channel runs in the DESTINATION thread of the caller. So if your target channel is slow, your destination is also slow.
-
-you probably are not utilizing all 10 source threads if your upstream channel is the only thing sending to this one
-
-YOLO. Set queue always and give it like 5-10 threads. Start there. Queue on failure wont queue UNTIL THERE IS A FAILURE.
-You'll still see slowness because your first channel is waiting on your second channel. The second channel is taking ~2 seconds per message. The queue in the first one will clearly demonstrate that. The multithreading may make it "good enough".
-
-if you want 10 threads in the downstream channel, you'll either need to enable the downstream source queue, or use 10 destination threads in the upstream channel
-
-With the source queue on, it will accept messages as fast as it can and distribute them among the source threads you have defined. With the source queue off, the 10 threads will be a maximum, but if there are only 5 threads sending messages synchronously, then it will only be using 5/10 threads at a time.
-
-Either option should allow the file reader to generate the messages much faster without waiting for the previous message to process
-
 ## HL7 Escaping rules
 
 See [here](https://docs.intersystems.com/latest/csp/docbook/DocBook.UI.Page.cls?KEY=EHL72_ESCAPE_SEQUENCES) and [here](https://www.hl7plus.com/Help/Notepad/index.html?hl7_escape_rules.htm).
@@ -232,15 +205,18 @@ See [here](https://docs.intersystems.com/latest/csp/docbook/DocBook.UI.Page.cls?
 
 _Zubcy_ 1 March 2023
 Team, Is there anyway to automatically reprocess the last message, whenever the channel is deployed? Not involving any polling functionalities.
+
 I have a polling channel where I have placed all my global Maps.. I have issues with Clustering plugin, for polling issues. Due to the issue, the channel is not polled after a server restart, hence the global maps are not withstanding a server restart.  I need something which can trigger that channel once it is deployed..
+
 I need something which can automatically reprocess the last message, when the server goes down in non support times..
+
 Its set to Poll on start, but as I said, we are using clustering plugin and can set only one node for polling in advanced clustering settings.. hence the nodes which have polling not enabled in advanced clustering settings, are not polling once they are started.
 
 _joshm_
 You could add code in your deploy script that calls the API(s) needed to do it. But there’s no GUI with a setting somewhere that would automatically do that.
 
 _jonb_
-For your original idea - I wouldn’t call the HTTP API. I would call the internal APIs. It could be as simple as doing router.routeMessage() to your channel or as complicated as calling ChannelController to pop a new message in
+For your original idea - I wouldn’t call the HTTP API. I would call the internal APIs. It could be as simple as doing router.routeMessage() to your channel or as complicated as calling ChannelController to pop a new message in.
 
 ## Sample message transformations from HL7v2 to FHIR
 
@@ -264,7 +240,7 @@ Ensure you do not have a [xalan](https://mvnrepository.com/artifact/xalan/xalan)
 
 ## Performance metrics
 
-## Improvements when pruning more often
+### Improvements when pruning more often
 
 _mklemens_ found that changing pruning from every 24 hours to every hour stopped his DB's autoscaling.
 
@@ -301,16 +277,16 @@ when map is a `java.util.Map`
 in prior rhino versions a js object is implemented with `NativeObject` and a java Map would have been represented by `NativeJavaObject` (basically a wrapper class.) rhino 1.7.13 introduced `NativeJavaMap` as a subclass of `NativeJavaObject` that adds this behavior.
 Also `NativeJavaList`, which allows you to access a `java.util.List` by index like a js array instead of using the get method.
 
+## Blank messages and mappings in dashboard
+
+User: messages are sent to the Channel and the channel send the messages to the destination channel. But when i look at the dashboard the Messages and the mappings are blank.
+Solution: Review your 'message storage' and 'message pruning' configuration - perhaps it is set to remove content on completion.
+
 ## Channel deployment tips
 
 9 Dec 2022
 Issue: channel changes were not being deployed.
 Solution: Be sure to undeploy the channel first as it resolved his issue.
-
-## Blank messages and mappings in dashboard
-
-User: messages are sent to the Channel and the channel send the messages to the destination channel. But when i look at the dashboard the Messages and the mappings are blank.
-Solution: Review your 'message storage' and 'message pruning' configuration - perhaps it is set to remove content on completion.
 
 ## Channel development tips
 
@@ -333,7 +309,7 @@ For #2 and #3 above, whether you use the source filter or destinationSet.removeA
 
 ### Channel naming conventions
 
-Initiator: Rodger Glenn, 2 Dec 2022
+Initiator: _Rodger Glenn_, 2 Dec 2022
 
 _jonb_:
 
@@ -367,7 +343,7 @@ _chris_: Does anyone know exactly what Mirth encrypts when you enable "Encryptio
 
 ## Why do I see 'dxx' set in responseMap within the Source mappings?
 
-Initiated by _Richard_
+Initiated by _Richard_, brainstormed by others
 
 Either a bug in the Mirth queries for map data, or perhaps it's the order of operations:
 
@@ -379,15 +355,3 @@ Either a bug in the Mirth queries for map data, or perhaps it's the order of ope
 1. D20 response transformer runs <- responseMap is populated here
 1. Destination Chain completes
 1. Source looks at response map and sends responseMsg as a reply
-
-## Channel stats missing after DB migration
-
-Initiator: _Bhushan U_ on 14 Nov 2022
-Solution provider: _agermano_
-
-Hello Team, I need some advice on migrating mirthconnect application with local postgresql database server from windows 2008 to windows 2012 server.
-So far I did postgres database backup and restore plus mirthconnect configuration files backup and restore. But there is still some discrepancy between new server and old server.
-
-Issue: channels stats not showing up after postgres database backup and restore then configuration files backup and restore
-Reason: channels statistics are saved per server ID
-Solution: Update the current server\'s ID to that of the original server. See [user guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_41/page/connect/connect/topics/c_Application_Data_Directory_connect_ug.html) for details.
