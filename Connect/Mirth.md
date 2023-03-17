@@ -1,6 +1,6 @@
 # NextGen Connect FAQs
 
-## <a name='OtherstrackingFAQs'></a>Others tracking FAQs
+## Others tracking FAQs
 
 See [_jonb_'s useful gists](<https://gist.github.com/jonbartels>) which overlap here in some areas. His [SSL writeup](https://gist.github.com/jonbartels/8abd121901eb930f46245d9ef0f5710e) is excellent.
 
@@ -8,11 +8,11 @@ See [Michael Hobbs' gists](https://gist.github.com/MichaelLeeHobbs) which includ
 
 NextGen manages a [repo](https://github.com/nextgenhealthcare/connect-examples) for various code templates.
 
-## <a name='OtherprojectsongithubusingMirth'></a>Other projects on github using Mirth?
+## Other projects on github using Mirth?
 
-See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in Mirth Slack found useful.
+See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in [Mirth Slack](https://mirthconnect.slack.com) found useful.
 
-## <a name='WhoiscurrentlysellingANYMirthextensionsorpaidextrasoftware'></a>Who is currently selling ANY Mirth extensions or paid extra software?
+## Who is currently selling ANY Mirth extensions or paid extra software?
 
 23 Jan 2023
 
@@ -21,9 +21,94 @@ See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in
 * [InterfaceMonitor](https://www.interfacemonitor.com/) / [xc-monitor](https://mirth-support.com/xc-monitor)
 * [MirthSync](https://saga-it.com/tech-talk/2019/03/15/mirthsync+installation+and+basic+usage) is [on GitHub](https://github.com/SagaHealthcareIT/mirthsync), is it a freemium model?
 
+## Where to start learning
+
+* Read through the [Mirth User Guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_42). It has a Best Practices section which can help your message throughput and minimize DB space.
+
+## Pruning question
+
+_tarmor_: If message has one destination in ERROR status, the purge process will not remove the message. If I search for messages in ERROR status and do "Remove results", it will only remove the destination messages, not the whole message. Will the purge process remove then the source and other destinations, since there is no error anymore?
+
+_jonb_
+[His gist](https://github.com/nextgenhealthcare/connect/blob/b3bd6308b789d16e4b562bd5686cef883fa1faf1/server/dbconf/postgres/postgres-message.xml#L412)
+This is for postgres. You can find sibling files for other DB engines for getMessagesToPrune . MC does a SELECT to find message IDs to remove then it does a second operation to actually delete those messages.
+A [recent release](https://github.com/nextgenhealthcare/connect/milestone/69?closed=1) of MC introduced “prune error” in 3.12.
+I wrote a custom pruner for my employer a few months ago. (_ed note_: stated in March 2023.) I have forgotten a lot of the details but I can find them again if there is sufficient interest.
+
+## Dealing with 'Early EOF' in HTTPReceiver
+
+_RunnenLate_
+anyone know how i can troubleshoot this error, i don't see a single message as error within the channel
+`ERROR  (com.mirth.connect.connectors.http.HttpReceiver:522): Error receiving message (HTTP Listener "Source" on channel 12c72fc1-39f4-4e55-840d-4bdcdb9b328f).
+org.eclipse.jetty.io.EofException: Early EOF`
+the client is trying to send just tons of concurrent connections and it's limited to 10 threads
+
+_tiskinty_
+based on experience, that's usually a network error
+I would guess it's a firewall issue based on the EOF, but that's not a sure thing by any means
+the thread/connection setup doesn't usually cause that from what I've seen before. 99% of the time when I've seen it, it was directly related to a firewall or VPN setup needing to be restarted
+Otherwise, it might be enough (depending on the actual networking setup) to re-deploy the channel. I've seen that work occasionally in the past. I wouldn't bank on it, but it's typically low risk
+
+_RunnenLate_
+no firewall in front of the server, just an F5 which there is no way I would restart
+I told the client to reduce their queue for 9000 to 100 and retry
+
+## JS "Object.values()" throws an error in Mirth
+
+_itsjohn_
+I’m using Object.values() but it throws an error ‘cannot find function values in object function Object ()’.
+
+_Daniel Ruppert_
+The Rhino Engine [doesn't implement](https://forums.mirthproject.io/forum/mirth-connect/support/19120-using-javascript-object-values) that until [v1.7.14](https://github.com/mozilla/rhino/pull/902). A [feature request](https://github.com/nextgenhealthcare/connect/issues/5541) was opened.
+
+## Advanced Clustering discussion with important bits
+
+_Ryan Howk_
+Does anyone have strong opinions for or against using Mirth Adv Clustering for Active Dual-Node w/ load balancer VS dual node with 2nd node as a failover (backup) node?
+
+_joshm_
+I’ve not heard a lot of favorable anecdotes in favor of the Adv Clustering Plugin. Maybe they’ve made some improvements in recent years, but idk. As Jarrod noted, Innovar does have a template you can use for a “low price” in AWS that does load balancing. I don’t have a lot of detail on it but I can get you in touch with the right folks. You basically pay fee for usage, but you host it yourself in whatever AWS environment you want. You own the config, we just provide the template.
+
+_Ryan Howk_
+thanks for the details, will check that out and see which load balancer we're using now... might be something in Azure, not sure... we recently upgraded to MC 4.1.1 and Adv Clustering 4.1 and still seeing some wonkiness with various channel tasks/errors
+
+_Anthony Leon_
+are you using it with a Mirth appliance? It's been a couple of years but the Advanced plugin had some additional functionality when paired with the appliance that made it really strong. Without an appliance, it required a bit more manual work to get going but it may be different these days.
+
+_Ryan Howk_
+good to know, that sounds vaguely familiar, we aren't using the appliance, we're hosting with Azure
+
+_Anthony Leon_
+I'd check to see if any of the current Mirth folks could verify that for you while also checking out solutions like mentioned above. Azure is always a tricky situation on top of it all.
+
+_tiskinty_
+Having used mirth in both adv cluster and loadbalancer configurations I would definitely lean hard in the loadbalancer direction unless you need message order preserved. The clustering has come quite a long way, but it's still not quirk-free.
+
+_Ryan Howk_
+agreed, it's not quirk-free... we're trying to decide if we want to keep dual active node setup or switch to a dual node with one node as a backup we can failover to if one node fails... are you guys using dual nodes with both being active?  I might be mis-wording this somewhat
+
+_Ryan Howk_
+I think we need message order preservation
+
+## Improvements when pruning more often
+
+_mklemens_ found that changing pruning from every 24 hours to every hour stopped his DB's autoscaling.
+
+_jonb_
+[mysql-message.xml](https://github.com/nextgenhealthcare/connect/blob/b3bd6308b789d16e4b562bd5686cef883fa1faf1/server/dbconf/mysql/mysql-message.xml#L371)
+The block size matters for Postgres. Has to do with how PG handles an IN clause.
+
+## Error: “Assignment to lists with more than one item is not supported”
+
+See [forum](https://forums.mirthproject.io/forum/mirth-connect/support/16781-): you’re trying to set a repeating segment to a non repeating segment
+
 ## What was included in the MCAL v1.3.1 release?
 
 _narupley_: new code signing cert that is baked into the launcher, that's it
+
+## Where can I view Mirth milestones, including planned tasks?
+
+Look [here](https://github.com/nextgenhealthcare/connect/milestones).
 
 ## Details on the Thread Assignment Variable
 
@@ -247,12 +332,12 @@ Though doing that could break your script in the future if we ever change stuff 
 
 ## Error message related to sourceMap
 
-Error text
+Encountered error text:
 The source map entry "VARNAME" was retrieved from the channel map. This method of retrieval has been deprecated and will soon be removed. Please use sourceMap.get('VARNAME') instead.
 
-Change all $('VARNAME') to sourceMap.get('VARNAME').
+Solution: Change all $('VARNAME') to sourceMap.get('VARNAME').
 
-This was encountered in v3.12.0, and the error message was seen in the [latest v4.2.0 code](https://github.com/nextgenhealthcare/connect/blob/development/server/src/com/mirth/connect/server/userutil/ChannelMap.java#L74), so upgrades and channel fixes can be independent.
+This was encountered in v3.12.0, and the error message was seen in the [latest v4.2.0 code](https://github.com/nextgenhealthcare/connect/blob/development/server/src/com/mirth/connect/server/userutil/ChannelMap.java#L74), so MC upgrades and channel fixes can be independent.
 
 ## How do I see the full runtime JS code?
 
@@ -308,11 +393,21 @@ _chris_
 Is the responseMap visible from the source transformer?
 Looks like the answer is "yes".
 
-## <a name='HL7tips'></a>HL7 tips
+## HL7 tips
 
 ### Escaping rules
 
 See [here](https://docs.intersystems.com/latest/csp/docbook/DocBook.UI.Page.cls?KEY=EHL72_ESCAPE_SEQUENCES) and [here](https://www.hl7plus.com/Help/Notepad/index.html?hl7_escape_rules.htm).
+
+### Add HL7 fields out of order
+
+[FixHL7NodeOrder.js](FixHL7NodeOrder.js) copied from [this comment](https://github.com/nextgenhealthcare/connect/issues/633#issuecomment-626857519)
+
+Usage example
+
+````javascript
+msg = fixHL7NodeOrder(msg);
+````
 
 ### Merging HL7 subcomponent text
 
@@ -452,17 +547,17 @@ Issue setting up the transformer steps when processing XML
 _agermano_ You can run in batch mode as there is a "number of header records" property so that it doesn't create messages container the column names.
 In this case I'd probably put a javascript step before your iterator with delete msg.row[0]. That should remove the first row from msg, and since you are dealing with xml, it will shift the remaining rows and reindex them. A regular javascript array doesn't do that.
 
-## <a name='EmbedBase64imageintoPDF'></a>Embed Base64 image into PDF
+## Embed Base64 image into PDF
 
 Kicked off by _mkopinsky_ 16 Jan 2023
 
 _agermano_ with all the important bits.
 
-### <a name='Option1'></a>Option 1
+### Option 1
 
 He recommends Document Writer as "the document writer actually gives you the option of writing to a mirth attachment, which makes it really easy to embed in a second destination".
 
-### <a name='Option2'></a>Option 2
+### Option 2
 
 "You can use the legacy Flying Saucer and iText libs which are [still included](https://github.com/nextgenhealthcare/connect/tree/4.2.0/server/lib/extensions/doc)". "Data urls work as long as you've registered a url protocol handler for 'data' types".
 
@@ -484,16 +579,16 @@ Then set
 _The first line adds the "data" protocol handler to the search path used by the URL class.
 The second line appends the jar to the end of the classpath at startup. This is an option used by the install4j launcher and not directly passed to the jvm_
 
-### <a name='Option3'></a>Option 3
+### Option 3
 
 Use the newer libraries
 "The main libraries used now are openhtmltopdf running on top of PDFBox 2.x" and the "new lib also supports svg graphics".
 
-## <a name='AccessingHTTPListenerrequestheadersandmetadatasettingcustomresponsecodes'></a>Accessing HTTP Listener request headers and metadata, setting custom response codes
+## Accessing HTTP Listener request headers and metadata, setting custom response codes
 
 See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/10305-access-request-headers-in-http-listener?p=69586#post69586).
 
-## <a name='HashingfilesMD5orother'></a>Hashing files (MD5 or other)
+## Hashing files (MD5 or other)
 
 See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/13366-md5-hashing?p=81191#post81191) on using Guava.
 
@@ -509,32 +604,32 @@ var hash = hasher.putBytes(decodedData).hash().toString();
 logger.info(hash);
 ````
 
-## <a name='SamplemessagetransformationsfromHL7v2toFHIR'></a>Sample message transformations from HL7v2 to FHIR
+## Sample message transformations from HL7v2 to FHIR
 
 13 Jan 2023
 _jonb_ recommends [these](https://confluence.hl7.org/display/OO/v2+Sample+Messages).
 
-## <a name='HaveaHTTPListenertorespondwithgzipdata'></a>Have a HTTP Listener to respond with gzip data
+## Have a HTTP Listener to respond with gzip data
 
 It's [automatic now](https://forums.mirthproject.io/forum/mirth-connect/support/13156-web-service-and-compress#post80922()) when given the proper request headers.
 
-## <a name='Optiontocheckforduplicatesingiventimeperiod'></a>Option to check for duplicates in given time period
+## Option to check for duplicates in given time period
 
 User wants to check for duplicate messages in a given 12 hour period. (11 Jan 2023)
 
 See [_agermano_](<https://forums.mirthproject.io/forum/mirth-connect/support/19116-filter-smtp-destination-unique-only?p=174475#post174475>)'s code snippet using guava which is included with Mirth. Guava allows expiring entries in multiple ways.
 
-## <a name='CanMirthverifycertificatesofexternalparties'></a>Can Mirth verify certificates of external parties?
+## Can Mirth verify certificates of external parties?
 
 (Feb 2023) Nothing directly in Mirth.
 
 _chris_: It's very easy to pull a remote cert. Just connect to the service via HTTP and the server will provide it. Then you check it for upcoming expiration. Something like [certcheck](https://github.com/ChristopherSchultz/certcheck) or [check_ssl_cert](https://exchange.nagios.org/directory/Plugins/Network-Protocols/HTTP/check_ssl_cert/details) or [check_ssl_certificate](https://exchange.nagios.org/directory/Plugins/Network-Protocols/HTTP/check_ssl_certificate/details) or [check_http](https://nagios-plugins.org/doc/man/check_http.html).
 
-## <a name='UsingCryptoJSjavascriptlibrary'></a>Using CryptoJS javascript library
+## Using CryptoJS javascript library
 
 See [here](https://forums.mirthproject.io/forum/mirth-connect/support/174848-use-require-from-node-js?p=174858#post174858).
 
-## <a name='UsingGPGwithMirth'></a>Using GPG with Mirth
+## Using GPG with Mirth
 
 12 Jan 2023
 
@@ -544,7 +639,7 @@ For running GPG outside Mirth, use this [code template](https://github.com/nextg
 
 For running within Mirth, you need an additional GPG library, says [here](https://forums.mirthproject.io/forum/mirth-connect/support/13544-can-i-encrypt-a-file-in-gpg-using-mirth). This [wrapper](https://github.com/neuhalje/bouncy-gpg) may be useful, but no one vouched for it.
 
-## <a name='ExpandanattachmentIdreceivedfromanotherchannelsresponsetransformer'></a>Expand an attachmentId received from another channel's response transformer
+## Expand an attachmentId received from another channel's response transformer
 
 _pacmano_'s question and solution 10 Jan 2023
 
@@ -565,12 +660,12 @@ var base64Decode = false;
 var attachmentContent = getAttachment(chanId, messageId,attachmentId,base64Decode).getContentString();
 ````
 
-## <a name='Mirthlicensing'></a>Mirth licensing
+## Mirth licensing
 
 Q1. Is CURES available under existing licenses or separate from other plugins?
 A1. _Travis West_: "It is separate and requires Gold or Platinum bundles." (Essentially an upcharge in addition to platinum.)
 
-## <a name='minimalexampleusing_JSch_'></a>Minimal example using JSch
+## Minimal example using JSch
 
 5 Jan 2023 by _joshm_
 
@@ -606,15 +701,17 @@ channel.put(msgBias, UUIDGenerator.getUUID() + '.hl7');
 channel.exit();
 ````
 
-## <a name='Myintegrationof_lodash_isntfunctioningasexpected'></a>My integration of _lodash_ isn't functioning as expected
+## My integration of _lodash_ isn't functioning as expected
 
 It matters which CDN you download its code from. [This one](https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js) was confirmed to work by _itsjohn_ on 10 Jan 2023.
 
-## <a name='IencounteroddStringandXMLerrorsintermittentlywhensendingbetweenchannels'></a>I encounter odd String and XML errors intermittently when sending between channels
+## I encounter odd String and XML errors intermittently when sending between channels
 
 Ensure you do not have a [xalan](https://mvnrepository.com/artifact/xalan/xalan) jar in your custom library. (_rogin_ to fill in what problems were presenting)
 
-## <a name='PerformancemetricsinAWS'></a>Performance metrics in AWS
+## Performance metrics in AWS
+
+### AWS example
 
 Seen in 2022
 "Can anyone point me in the direction of documentation/tips around best practice data pruner configuration settings? We have a server with > 1000 channels and millions of messages processed each day. We only store 5 days worth of data on each channel and prune daily, but the data pruner is taking over 32 hours to run with some individual channels taking over 45 minutes to prune about 209k messages and 2million content rows.  Database is MySQL running on an AWS RDS instance.  Is that the best I can expect the pruner to perform?  Am I better off pruning less often even though it will need to churn through more messages per run? Should I be tweaking the block size (currently set at 1000)?  Thanks for any pointers!"
@@ -622,7 +719,19 @@ Seen in 2022
 same person:
 "this instance is running on an AWS c5.12xlarge EC2 instance running linux and pointing to an AWS RDS r5.4xlarge MySQL DB. 1174 deployed channels with varying degrees of volume on them.  The server is mainly receiving messages via TCP and then writing out to a MSSQL DB so not a ton of complicated processing happening within the channels themselves."
 
-## <a name='IncludingsourceChannelIdswhenusingrouter.routeMessage'></a>Including sourceChannelId(s) when using router.routeMessage()
+### Who's using Mirth at global scale?
+
+_ThisIsTheWay_: What's the largest corporate customer using Mirth Connect? Our organization is evaluating Mirth Connect to see if we will keep it or go with something like Ensemble.
+
+_joshm_
+there is a healthcare enterprise that owns many hospitals and physician clinics that have a few hundred instances deployed across the country
+Then there are Health Information Exchanges that run hundreds of channels on multiple instances and do hundreds of thousands of messages per day
+as I understand it, Ensemble and Corepoint and similar products are very “Enterprise” style. But I can tell you that many large Health IT companies also use Mirth very successfully. A worked for a large health system in the US that deployed thousands of Mirth instances in Production
+
+_Anthony Leon_
+ I'm former Mirth, Lyniate (sold Corepoint, Rhapsody, and the managed service after Datica/Sansoro acquisition) and did a quick stint at Health Gorilla. I worked in med device prior to joining Mirth as well. Happy to chat about different things with you. I of course cannot disclose specific clients (that aren't public) for any of the orgs due to certain agreements and what not but can help shed light onto your situation.
+
+## Including sourceChannelId(s) when using router.routeMessage()
 
 2 Jan 2023
 
@@ -655,7 +764,7 @@ message.setSourceMap(attributes);
 router.routeMessage('Test1', message);
 ````
 
-## <a name='EnableJSmaplookupsbuthidethemappedvaluesfromthedashboardview'></a>Enable JS map lookups but hide the mapped values from the dashboard view
+## Enable JS map lookups but hide the mapped values from the dashboard view
 
 An interesting discussion 19 Dec 2022 to generate lookups but omit its confidential values from dashboard view.
 
@@ -668,7 +777,7 @@ var wrapper = Object.create(hm)
 wrapper.toJSON = () => "No peeking!"
 ````
 
-## <a name='UnderstandXMLsnamevslocalName'></a>Understand XML's name() vs localName()
+## Understand XML's name() vs localName()
 
 20 Dec 2022 by _agermano_
 
@@ -703,7 +812,7 @@ js> msg.localName()
 xml
 ````
 
-## <a name='ReturnmultipleobjectsfromaJSreader'></a>Return multiple objects from a JS reader
+## Return multiple objects from a JS reader
 
 _agermano_ 14 Dec 2022
 
@@ -745,7 +854,7 @@ try{
 return resultArray;
 ````
 
-## <a name='ConvertTimestampESTtoPSTwithformatYYYYMMDDhhmmss'></a>Convert Timestamp EST to PST with format YYYYMMDDhhmmss
+## Convert Timestamp EST to PST with format YYYYMMDDhhmmss
 
 Conversation on 5 Dec 2022 by _Anibal Jodorcovsky_
 
@@ -773,7 +882,7 @@ const zonedDateTime = ZonedDateTime.parse(msg.approvedDT, parseFmt).withZoneSame
 const appDtStr = String(zonedDateTime.format(writeFmt))
 ````
 
-## <a name='Auto-generatevalueforMSH.10'></a>Auto-generate value for MSH.10
+## Auto-generate value for MSH.10
 
 Initiator: Nathan Corron
 anyone know if there is a function in mirth to get an incrementing unique number that could be used for say MSH-10?  Needs to be numeric
@@ -792,13 +901,15 @@ _jonb_ and _pacmano_: process as batch. check if var 'batchSequenceId' >= X, the
 
 _Jarrod_: you can also manually split in a pre-processor for X loops, forward to a processing channel and then ditch the rest
 
-_jonb_: other ideas
+_jonb_'s other ideas
 
 * Use the shell exec code template and ahh something something sed awk something the first 15 lines and dump those to a batch splitter
 * I don’t think there is any way for the preprocessor to handle the CSV batch
 * Use a RAW datatype instead of delimited first, grab the raw as an attachment. Don’t parse it as delimited until AFTER cutting the size down to 15 lines
 
-## Info on Rhino (v1.7.13) in Mirth (vXXX)
+## Info on new functionality in Rhino v1.7.13
+
+(Rhino 1.7.12 is in Mirth 3.12.0, and Rhino 1.7.13 in Mirth 4.2, so it may have been included in the initial Mirth 4.x line)
 
 _agermano_: like I said, the map[foo] should work in your current mirth version (I've tested it with rhino 1.7.13, but not actually in mirth)
 when map is a java.util.Map
@@ -817,7 +928,7 @@ That will allow me to go and hunt-down all the references in my js code and repl
 Then I can swap-out the object for the type I really want. In the meantime I still have all kinds of concurrency issues, but I don't have to stop-the-world to re-write all that code.
 Yep, looks like object.get doesn't exist and defining it works as expected."
 
-## <a name='Channeldeploymenttips'></a>Channel deployment tips
+## Channel deployment tips
 
 9 Dec 2022
 Issue: channel changes were not being deployed.
@@ -828,7 +939,7 @@ Solution: Be sure to undeploy the channel first as it resolved his issue.
 User: messages are sent to the Channel and the channel send the messages to the destination channel. But when i look at the dashboard the Messages and the mappings are blank.
 Solution: Review your 'message storage' and 'message pruning' configuration - perhaps it is set to remove content on completion.
 
-## <a name='Channeldevelopmenttips'></a>Channel development tips
+## Channel development tips
 
 * Set your response data type to RAW. That will force your response transformer code to always execute no matter what. (_joshm_ 7 Dec 2022)
 ** user's code to error after X send attempts was failing, needed the above [to resolve](https://github.com/nextgenhealthcare/connect/discussions/4795). (29 Dec 2022)
@@ -847,7 +958,7 @@ For #2 and #3 above, whether you use the source filter or destinationSet.removeA
 * _agermano_: for RAW messages, msg will be a java string and connectorMessage.getRawData() will be a javascript string
 * _jonb_: (Regarding file hashing) With HL7 you can have things where two messages are the same except for the MSH header information. So the hash should compute on segments other than MSH to really detect duplicates.
 
-### <a name='Channelnamingconventions'></a>Channel naming conventions
+### Channel naming conventions
 
 Initiator: Rodger Glenn, 2 Dec 2022
 
@@ -868,19 +979,20 @@ SITECODE_function. If multitenant EHRBRAND_function. and USE TAGS FOR PORTS as c
 _Michael Hobbs_:
 I like to also start any channel that listens on a port with said port number. Then if I need I can click the channel view and sort by name.
 
-## <a name='Messagesearchingtips'></a>Message searching tips
+## Message searching tips
 
 * Set "page size" to 1 to greatly speed up queries you expect to contain only one result. (_pacmano_ 7 Dec 2022)
+* Search with just the “has errors” checkbox for an error. I’ve seen a situation where you can get an error but the message status doesn’t get set to ERROR (_joshm_)
 
-## <a name='Createindexonmetadatacolumns'></a>Create index on metadata column(s)
+## Create index on metadata column(s)
 
 By default, indices are not created for metadata columns.
 
-### <a name='Option1-1'></a>Option #1
+### Option #1
 
 _jonb_'s [gist](https://gist.github.com/jonbartels/38ffbb101ea32f981cc9950a21ec6809)
 
-### <a name='Option2-1'></a>Option #2
+### Option #2
 
 _Michael Hobbs_' solution
 [DBConnection.js](DBConnection.js) needed for ChannelUtils
@@ -903,7 +1015,7 @@ const messages = ChannelUtils.getMessageByIndexV2({
     })
 ````
 
-## <a name='WhatdoesMirthencrypt'></a>What does Mirth encrypt?
+## What does Mirth encrypt?
 
 Jan 2023 timeframe
 
@@ -911,7 +1023,7 @@ _chris_: Does anyone know exactly what Mirth encrypts when you enable "Encryptio
 
 (nothing back yet that he wanted to preserve here)
 
-## <a name='whydoIseedxxsetinresponseMapwithintheSourcemappings'></a>Why do I see 'dxx' set in responseMap within the Source mappings?
+## Why do I see 'dxx' set in responseMap within the Source mappings?
 
 Either a bug in the Mirth queries for map data, or perhaps it's the order of operations:
 
@@ -924,23 +1036,23 @@ Either a bug in the Mirth queries for map data, or perhaps it's the order of ope
 1. Destination Chain completes
 1. Source looks at response map and sends responseMsg as a reply
 
-## <a name='RhinoshellforMirthConnect'></a>Access Rhino shell used by Mirth Connect
+## Access Rhino shell used by Mirth Connect
 
 Outlined by [_jonb_](https://gist.github.com/jonbartels/d8a1b789dd251e30c4a74baac3a3957a).
 
-## <a name='CanMirthprovideadailyvolumereport'></a>Can Mirth provide a daily volume report?
+## Can Mirth provide a daily volume report?
 
 See _jonb_'s [SQL](https://gist.github.com/jonbartels/b961574b2043b628f1b0fd96f440179b).
 
-## <a name='CommonMirthneeds'></a>Common Mirth needs
+## Common Mirth needs
 
-### <a name='Extractingazipfle'></a>Extracting a zip fle
+### Extracting a zip fle
 
 See [forum](https://forums.mirthproject.io/forum/mirth-connect/support/15433-unzipping-files-in-mirth)
 
-## <a name='SimplifiedJavascript'></a>Simplified Javascript
+## Simplified Javascript
 
-### <a name='FormatStringthatmaycontainadecimal'></a>Format String that may contain a decimal
+### Format String that may contain a decimal
 
 _joshm_: take a string representation of a number that may or may not have decimals already and force it to be 2 decimal places (i.e 35 or 35.00 should both end up as 35.00)
 
@@ -957,17 +1069,7 @@ var df = new java.text.DecimalFormat("0.00##");
 return df.format(sumOfCharges);
 ````
 
-## <a name='AddHL7fieldsoutoforder'></a>Add HL7 fields out of order
-
-[FixHL7NodeOrder.js](FixHL7NodeOrder.js) copied from [this comment](https://github.com/nextgenhealthcare/connect/issues/633#issuecomment-626857519)
-
-Usage example
-
-````javascript
-msg = fixHL7NodeOrder(msg);
-````
-
-## <a name='ChannelstatsmissingafterDBmigration'></a>Channel stats missing after DB migration
+## Channel stats missing after DB migration
 
 Initiator: _Bhushan U_ on 14 Nov 2022
 Solution provider: _agermano_
@@ -979,7 +1081,7 @@ Issue: channels stats not showing up after postgres database backup and restore 
 Reason: channels statistics are saved per server ID
 Solution: Update the current server\'s ID to that of the original server. See [user guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_41/page/connect/connect/topics/c_Application_Data_Directory_connect_ug.html) for details.
 
-## <a name='Case-insensitiveJSONfields'></a>Case-insensitive JSON fields
+## Case-insensitive JSON fields
 
 Initiator:
 _itsjohn_: Hi All, Is there. a way to make JSON payload fields case insensitive when mapping in Mirth so I can write msg['foo'] and Mirth accepts {"foo":""}, {"FOO":""} and {"Foo":""}
@@ -1002,11 +1104,11 @@ msg.baz.sandwich = 4;
 JSON.stringify(msg);
 ```
 
-## <a name='Migratefile-backedconfigmapintoMirthDB'></a>Migrate file-backed config map into Mirth DB
+## Migrate file-backed config map into Mirth DB
 
 See [_jonb_'s gist](<https://gist.github.com/jonbartels/4c4e0320f5596645b32bb1c38ac2d9c3>).
 
-## <a name='Comparerunningchannelsagainstamasterlist'></a>Compare running channels against a master list
+## Compare running channels against a master list
 
 This produces a list of key, pairs for channels and state. Run it on a polling channel to see what's running and compare it to a master list of what should be running. If the lists don't match, fire an alert of your choosing.
 
@@ -1030,7 +1132,7 @@ var sourceTry = JSON.stringify(channelStatus);
 $c("SourceTry",sourceTry);
 ````
 
-## <a name='GroupandSumusingJS'></a>Group and Sum using JS
+## Group and Sum using JS
 
 _nafwa03_ on 17 Nov 2022
 
@@ -1094,7 +1196,9 @@ function groupAndSum(arr, groupByKeys, sumKeys) {
 }
 ````
 
-## <a name='Improvedchannelcloning'></a>Improved channel cloning
+## Improved channel cloning
+
+It's a repeatedly [requested feature](https://github.com/nextgenhealthcare/connect/issues/4206).
 
 [Archived link](https://mirthconnect.slack.com/archives/C02SW0K4D/p1668089121891089)
 _Chris_: Before my upgrade from 3.8.0 -> 4.1.1, I had a channel which I used to create other channels from templates. It clones the channel and then makes sure that various Code Template Libraries are copied along with them, and tags, too, since "channel clone" is IMO incomplete because it skips those things.
@@ -1116,11 +1220,11 @@ setChannelLibrariesByName(createdChannelIds, ['Shared Integration', 'EHR Stuff']
 setChannelGroupByName(createdChannelIds, 'PCC Practices', serverEventContext);
 ````
 
-## <a name='WhatisthelayoutofaMirthdatabase'></a>What is the layout of a Mirth database?
+## What is the layout of a Mirth database?
 
 See [this ER diagram](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png).
 
-## <a name='Calculateaverageresponsetimeforagivenchannelsmessages'></a>Calculate average response time for a given channel's messages
+## Calculate average response time for a given channel's messages
 
 ````sql
 with started as (select message_id, received_date from d_mm388 where connector_name = 'Source'),
@@ -1141,13 +1245,13 @@ Given a JS reader, I want to return one message for many rows using a JS DB quer
 
 _narupley_: The Database Reader will do that automatically for you if you have the Aggregate Results option enabled. If you're in JavaScript mode, then you can return either a ResultSet or a List of Maps.
 
-## <a name='ReportonSSLCertificateUsage'></a>Report on SSL certificate usage
+## Report on SSL certificate usage
 
 _jonb_ rediscovering his own gist - "Is there a report for the NG SSL Manager that shows what channels are using a particular certificate?"
 
 See [_jonb_'s gist](https://gist.github.com/jonbartels/f99d08208a0e880e2cee160262dda4c8).
 
-## <a name='ReadandmapMirthlicensingdata'></a>Read and map Mirth licensing data
+## Read and map Mirth licensing data
 
 _jonb_ on 6 Oct 2022, seems to be a repost of an archived message.
 
@@ -1181,7 +1285,7 @@ from almost_there
 order by lastValidation ASC;
 ````
 
-## <a name='Prunemessageswhileavoidingerroredmessages'></a>Prune messages while avoiding errored messages
+## Prune messages while avoiding errored messages
 
 2 Sept 2022
 Commenter:
