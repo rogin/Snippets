@@ -14,6 +14,15 @@ trace-command -expression {"g*","s*" | Get-Alias } -name parameterbinding -pshos
 Get-TraceSource
 ````
 
+## Updating Microsoft Store apps
+
+From [here](https://social.technet.microsoft.com/Forums/windows/en-US/5ac7daa9-54e6-43c0-9746-293dcb8ef2ec/how-to-force-update-of-windows-store-apps-without-launching-the-store-app):
+
+````powershell
+Get-CimInstance -Namespace "Root\cimv2\mdm\dmmap" -ClassName "MDM_EnterpriseModernAppManagement_AppManagement01" |
+Invoke-CimMethod -MethodName UpdateScanMethod
+````
+
 ## Simple things I forget
 
 ### Converting to int and string
