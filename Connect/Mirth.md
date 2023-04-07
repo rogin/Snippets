@@ -8,17 +8,234 @@ See [Michael Hobbs' gists](https://gist.github.com/MichaelLeeHobbs) which includ
 
 NextGen manages a [repo](https://github.com/nextgenhealthcare/connect-examples) for various code templates.
 
-## Where can I view Mirth milestones, including planned tasks?
+## Past and planned Mirth updates
+
+### Where can I view Mirth milestones, including planned tasks?
 
 Look [here](https://github.com/nextgenhealthcare/connect/milestones).
+
+### What was included in the MCAL v1.3.1 release?
+
+_narupley_: new code signing cert that is baked into the launcher, that's it
 
 ## Other projects on github using Mirth?
 
 See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in [Mirth Slack](https://mirthconnect.slack.com) found useful.
 
+## Where to start learning
+
+* Read through the [Mirth User Guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_42). It has a Best Practices section which can help your message throughput and minimize DB space.
+
 ## How do I
 
 See our [new section](HowDoI.md).
+
+## Where are those scripts by Alex Aitougan?
+
+[_jonb_](https://github.com/nextgenhealthcare/connect/discussions/4918#discussioncomment-1823705): Alex Aitougan shared some snippets at [#3819](https://github.com/nextgenhealthcare/connect/issues/3819#issuecomment-692894231) that may help you
+My team and I have used these in a limited capacity for lower-volume workloads. We did have to modify them but I don't recall exactly how. These are a good baseline.
+
+## What does the 'pause' button actually do?
+
+If I have a large queue and I pause the channel, does the queue continue to process?
+
+“pause” just stops your source connector. the destinations continue to execute.
+
+## Latin-ish char showing up in my received messages
+
+_pacmano_ seeing a "Ã" being received in a raw HL7 coming into a HTTP Listener.
+
+_chris_
+Mirth doesn't let you sent the connector's charset for inbound.
+So it will follow HTTP spec which is that the default charset for text/* without a charset parameter is ISO-8859-1.
+Try setting "binary mime types" to "anything".
+Then you'll just get bytes, and you can convert to string yourself and force UTF-8 encoding.
+But I think your config may be the problem, here.
+You could ask the sender to use text/plain; charset-UTF-8 and see if that improves things.
+
+_pacmano_
+That fixed it. No code changes on my side needed.
+
+## What is the indication when red numbers display in the Dashboard's Connection column?
+
+That you're using all of the Max Connections defined in your TCP Listener.
+
+## Properly use destinationSet filtering
+
+Richard
+This design can handle being fed a junk input message so that the junk message doesn't get sent to all destinations. It also ERRORs properly so investigations can occur.
+
+### Example 1
+
+This can be a code template:
+
+````javascript
+//allows us to consistently check the return value
+function removeAllExcept(values) {
+  var removed = destinationSet.removeAllExcept(values);
+
+  if (!removed) {
+    throw "Failed to remove destination(s), developer typo? Values=" + values;
+  }
+}
+````
+
+Then in your source transformer:
+
+````javascript
+//default to treating input as faulty
+var filterReason = "Invalid input";
+// this destination acts as a default fail-safe and throws an
+//error on that destination so someone gets a notice it fell through
+var valuesToKeep = [3];
+
+//Allergy
+if (msg['MSH']['MSH.9']['MSH.9.1'].toString() == "ADT" && msg['MSH']['MSH.9']['MSH.9.2'].toString() == "A31") {
+  filterReason = "Allergy";
+  valuesToKeep = [1];
+}
+//Medication
+else if (msg['MSH']['MSH.9']['MSH.9.1'].toString() == "RDS" && msg['MSH']['MSH.9']['MSH.9.2'].toString() == "O01") {
+  filterReason = "Medication";
+  valuesToKeep = [2];
+}
+
+removeAllExcept(valuesToKeep);
+
+connectorMap.put('filterReason', filterReason);
+````
+
+### Example 2 using a contextPath
+
+You could also filter based on a contextPath as _germano_ wanted when using a HTTP Listener:
+"My thought was to name the destinations after the context path, so that I could do a simple `destinationSet.removeAllExcept([contextPath])` (as the function accepts both destination names AND IDs) to have it route the message to the correct destination. If a destination doesn't exist for the context path, then it would remove all destinations leaving nothing to do, and it could return a default response.
+I'll just set the responseMap variable in the source transformer as if it failed, and it won't get overwritten by any of the destinations"
+
+_pacmano_
+as a “safety” measure I still add a filter to the destination to catch the oops.
+
+_hermano_
+default destination as mentioned above, or pre-populate a channel/response map variables with default values if sender is expecting a response.
+add a filter for the supported/expected HTTP Methods in the Source Filter.
+the Http Listener status codes if you choose to send anything other than 200, accepts a string.
+dont forget to set the response content-type, you might have to populate those headers in the response map and set them per destination/response transformer.
+http listener should respect gzip content-type headers, never tested this though.
+
+## Clarity regarding `Max Processing Threads` and `Max Connections`
+
+_Richard_
+if `Max Processing Threads=2` and `Max Connections=10`, this means i can have up to `2 * 10` incoming messages at once?
+
+_pacmano_
+Kinda sure that is a no.  It allows the remote side to open 10 TCP connections, but you are still limited to 2 threads.
+
+_Richard_
+interesting. with this config it receives ~5700/min. do the more experienced keep to a 1-to-1 or 1-to-2 ratio on those values?
+
+_pacmano_
+source threads > 1 do not guarantee message order. so I would guess most people do one thread. e.g. your current setup could result in bad stuff depending on your use cases.
+
+_Richard_
+understood. thankfully MO isn't necessary for that client.
+
+_agermano_
+One client can open multiple connections or multiple clients can all connect to the same channel. Your number of threads says how many messages mirth will process concurrently, so they aren't really related. connection threads will block if there is not a source thread available to receive a message when the client attempts to send one. unless you have the source queue enabled, in which case it will accept the message immediately to the queue, and then process when the source thread becomes available. connections are typically managed by the OS TCP stack, where source threads are managed by mirth and the JVM.
+
+## Options for HTTP Listener with increased volume
+
+_Genarro_
+I have a REST API mirth channel with an HTTP listener as a source connector and it routes to multiple HTTP Sender endpoints got GET requests. Currently, the response from the endpoints are sent back as a response map variable back to the requesting system. It has worked fine until now with low volume, but now it needs to support at least 5 incoming messages a second. Turning on Source Queue seemed like the best option, but I lose the ability to send a response back via a response map. Is there a different approach where I can handle the higher number of incoming messages but also still be able to send back an endpoint response? Is this possible, even if that means introducing more channels?
+
+_jonb_
+Source queue OFF
+Destination queues OFF
+Increase source threads. You’ll get one source thread handling one request and waiting on your one or more destinations for the response.
+If your response is generated from the completion of all destinations then you’re stuck with a synchronous process. If your response only needs the response from one or some destinations then enable queueing for the destinations that do not contribute to the response.
+Firing all 5 destinations in parallel and waiting for the response is possible but its tricky to wire up. Is that relevant to your use case? Are the destinations in parallel or sequential?
+
+_Genarro_
+All the destinations are separate and there is no daisy chaining, but some endpoints call other endpoints via Javscript using `router.routeMessage()`
+It’s a bit of a mess that needs a restructuring. It’s all happening in one channel. I’d like to break that out, but can’t see how I could send a response back across channels to the original request.
+@jonb If I can clean things up and have each destination independent of all the others, is there anything else I need to consider for that parallel approach that you mentioned above?
+
+_jonb_
+If the destinations are independent and you can asynchronously send meessages, that is ideal.
+Sending parallel, synchronous messages in Mirth is possible. You have to manually create a Thread object and then have it do the router.route calls then start n-threads, then wait for those threads to complete.
+Its ehh 6 or 7 out of 10 in terms of complexity. Its tricky to make it right and do the logging to make it work well.
+@hermano did some work with this but I do not remember if it was open source and he’s out of the Mirth game these days.
+
+_pacmano_
+Different URIs? Load balancer in front splitting to X channels via path as needed. Can even clone current channels.
+
+_Genarro_
+Different URIs is a great approach I hadn’t thought about. So having nginx load balance to multiple clones of that channel sounds very easy to scale. Just clone more channels as needed. That’s assuming the Mirth server has the hardware to keep up.
+I would hope I could still use Jon’s approach of parallelization with no source or destination queues to be as efficient on the server and channel level.
+Thank you both. I was having a hard time finding my specific use case in the forums and GitHub discussions.
+
+_hermano_
+What Jon said above, there was another recent thread re: http calls/multiple endpoints on one channel
+If you can, make sure you are determining what context path the request is coming from and filter out the destination set as soon as possible, remove unwanted copies of messages that go nowhere for the other destinations. for separation of concerns each destination should only handle a single context path, you could do multiple but you would be able to use the dashboard a bit easier. make sure to filter the supported http methods as well in the source filter (either check this up front in the source filter, or at the destination filter since each context path/resource could support different methods). you mentioned the response map, that’s the right way to do it, resetting it in the active destinations (please add a default error and/or success cases in case you get a request that doesn’t match any of your filters/or destinations), and make sure you are looking out for that edge case as well in the destinations.
+If you are offloading to other channels and still want a response, you can do the multi-threaded method jon mentioned, you do get a less visibility of what is going on but it would speed up your requests a lot if you have to do multiple things in parallel in a single request.
+keep each request/destination as dumb as possible, the more complex the more and more those timeouts are going to be increasing.
+be nice to the requester, where possible set the correct response content-type headers and any other relevant headers and use the correct http status codes. e.g. `200s, 400s, 500s`, etc (someone can correct me, but that is a string value for that field in the ui) and setting `application/xml, json, etc`. take advantage of the gzip options the engine provides (read the manual for further details)
+for the filtering above, start with an object with all the supported paths, have each path have its corresponding, allowable http methods, and you can leverage that in any of the filtering stages. (if we can filter out, throw garbage/malformed requests as quick as possible, might as well short circuit the message process and free up a thread.)
+since you’d be parsing the context path anyway, i’d make sure to map those and set them as metadata columns
+re: filtering vs filtering destination sets
+I forget what the meta is now but I recall people favoring one over the other (maybe for metrics reasons?). you won’t have a row for the destinations that get removed in the dashboard, but the biggest upside is less db writes/processing having to add more copies of a single message as needed. `(source(raw, processed, transformed, etc) + (n* destinations(raw, processed, transformed, etc)))` depending on the message storage level
+i’d be willing to install mc locally for a week or two to write up a “here’s the expressjs equivalent (as much as possible) channel(s) in connect”
+
+## Details on QUEUED and RECEIVED statuses
+
+_agermano_
+QUEUED is only used on destination connectors. Messages in the source queue have a RECEIVED status which basically means the raw message has been committed to the database, but the message has not yet been processed.
+
+## Thread usage when not queuing
+
+_agermano_
+If you have one thread, aren't using destination queuing, and have a slow destination, that destination will slow everything down. The channel needs to wait for every destination to produce a result before calling the post-processor (if there is one,) sending the response upstream (if there is one configured on the source tab) and then starting to process the next message.
+
+When you are not using 'wait for previous destination' and you are not using destination queuing, then each destination chain gets its own thread except for one (I think the last one) that runs on the same thread as the source connector.
+
+## MC plugin ideas
+
+### Channel dependency graph
+
+_Richard_ developed a PowerShell script to export the channel dependencies to DOT language, then used graphviz to generate a SVG. This would be helpful directly in Mirth as a plugin.
+
+### What is my IP
+
+_jonb_
+MC plugin idea - “What is my IP?”
+Its trivial to do with a channel that calls ifconfig.me but a button would be handy.
+
+_pacmano_
+what is my local IP, what is my public IP, what is my container host IP.
+
+_jonb_
+How is the container host IP discoverable from software?
+Local interfaces can be enumerated
+
+_Jarrod_ with [SO question](https://stackoverflow.com/questions/9481865/getting-the-ip-address-of-the-current-machine-using-java)
+
+## Mirth quirks that can bite you
+
+### No-op transformers that are enabled
+
+You'll see a recursive write error. Disable / delete the trans then redeploy. (TODO: VERIFY THIS ONE)
+
+### ERROR status should be set but isn't
+
+_joshm_
+have you searched with just the “has errors” checkbox to see if you can find it there? I’ve seen a situation where you can get an error but the message status doesn’t get set to ERROR
+
+### Moving a channel to a group fails when using a filter
+
+See [issue](https://github.com/nextgenhealthcare/connect/issues/3898) opened in 2016. Still occurs in 4.0.1-4.2.
+
+_jonb_
+Funny story on [related ticket](https://github.com/nextgenhealthcare/connect/issues/4084). This got Zen in some hot water. As I recall Josh or Ron were hacking in $LARGE_CUSTOMER and loaded the channel view. This customer was so large it took a while (over a minute) for the channel list to load. So the dev just started working. They added a new channel + group, then POOF something like 200+ channels were suddenly un-grouped.
+Under the covers the client sends the whole set of channels to MC and that set is saved somewhere in the config table. Its a list of groups with child channel IDs.
+To support the filtered view either the client has to … do magic.. IDK… or the server has to support discrete operations on single channels AND the client has to be poking those updates to the server.
 
 ## Who is currently selling ANY Mirth extensions or paid extra software?
 
@@ -29,15 +246,11 @@ See our [new section](HowDoI.md).
 * [InterfaceMonitor](https://www.interfacemonitor.com/) / [xc-monitor](https://mirth-support.com/xc-monitor)
 * [MirthSync](https://saga-it.com/tech-talk/2019/03/15/mirthsync+installation+and+basic+usage) is [on GitHub](https://github.com/SagaHealthcareIT/mirthsync), is it a freemium model?
 
-## Where to start learning
-
-* Read through the [Mirth User Guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_42). It has a Best Practices section which can help your message throughput and minimize DB space.
-
 ## Pruning logic clarification
 
 _tarmor_: If message has one destination in ERROR status, the purge process will not remove the message. If I search for messages in ERROR status and do "Remove results", it will only remove the destination messages, not the whole message. Will the purge process remove then the source and other destinations, since there is no error anymore?
 
-_jonb_'s [gist](https://github.com/nextgenhealthcare/connect/blob/b3bd6308b789d16e4b562bd5686cef883fa1faf1/server/dbconf/postgres/postgres-message.xml#L412). This is for postgres. You can find sibling files for other DB engines for getMessagesToPrune . MC does a SELECT to find message IDs to remove then it does a second operation to actually delete those messages. A [recent release](https://github.com/nextgenhealthcare/connect/milestone/69?closed=1) of MC introduced “prune error” in 3.12. I wrote a custom pruner for my employer a few months ago. (_ed note_: stated in March 2023.) I have forgotten a lot of the details but I can find them again if there is sufficient interest.
+_jonb_'s [gist](https://github.com/nextgenhealthcare/connect/blob/b3bd6308b789d16e4b562bd5686cef883fa1faf1/server/dbconf/postgres/postgres-message.xml#L412). This is for postgres. You can find sibling files for other DB engines for `getMessagesToPrune`. MC does a SELECT to find message IDs to remove then it does a second operation to actually delete those messages. Version 3.12 of MC [introduced](https://github.com/nextgenhealthcare/connect/milestone/69?closed=1) “prune error”. I wrote a custom pruner for my employer a few months ago. (_ed note_: stated in March 2023.) I have forgotten a lot of the details but I can find them again if there is sufficient interest.
 
 ## Advanced Clustering discussion with important bits
 
@@ -69,6 +282,29 @@ _Ryan Howk_
 I think we need message order preservation
 
 ## Error strings and their solutions
+
+### Error when deploying channel
+
+Error text: `module java.base does not "opens java.util.concurrent.atomic" to unnamed module`
+
+_jonb_
+Add `--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED` to the `.vmoptions` file
+NG needs to update the vmopts file.
+[Existing ticket?](https://github.com/nextgenhealthcare/connect-docker/issues/22)
+
+### '500 Server Error' on Dashboard for mac
+
+After a fresh install of Mirth on a mac, Dashboard page continously logs:
+
+````
+Method failed: HTTP/1.1 500 Server Error
+com.mirth.connect.client.core.ClientException: Method failed: HTTP/1.1 500 Server Error
+at com.mirth.connect.client.core.ServerConnection.handleResponse(ServerConnection.java:533)
+at com.mirth.connect.client.core.ServerConnection.handleResponse(ServerConnection.java:457)
+...
+````
+
+Add the vmoptions as described [here](https://github.com/nextgenhealthcare/connect#java9).
 
 ### Error: `Assignment to lists with more than one item is not supported`
 
@@ -105,10 +341,6 @@ the thread/connection setup doesn't usually cause that from what I've seen befor
 
 _RunnenLate_
 no firewall in front of the server, just an F5 which there is no way I would restart. I told the client to reduce their queue for 9000 to 100 and retry.
-
-## What was included in the MCAL v1.3.1 release?
-
-_narupley_: new code signing cert that is baked into the launcher, that's it
 
 ## Details on the Thread Assignment Variable
 
@@ -218,7 +450,9 @@ You could add code in your deploy script that calls the API(s) needed to do it. 
 _jonb_
 For your original idea - I wouldn’t call the HTTP API. I would call the internal APIs. It could be as simple as doing router.routeMessage() to your channel or as complicated as calling ChannelController to pop a new message in.
 
-## Sample message transformations from HL7v2 to FHIR
+## Sample message transformations
+
+### HL7v2 to FHIR
 
 13 Jan 2023
 _jonb_ recommends [these](https://confluence.hl7.org/display/OO/v2+Sample+Messages).
@@ -232,13 +466,26 @@ _chris_: It's very easy to pull a remote cert. Just connect to the service via H
 ## Mirth licensing Q&A
 
 Q1. Is CURES available under existing licenses or separate from other plugins?
-A1. _Travis West_: "It is separate and requires Gold or Platinum bundles." (Essentially an upcharge in addition to platinum.)
+A1. Mirth Rep _Travis West_: "It is separate and requires Gold or Platinum bundles." (Essentially an upcharge in addition to platinum.)
+Q2. Wasn't the Advanced Clustering plugin provided at Gold level?
+A2. Users noticed it was bumped to Platinum in early 2023. _Richard_ was looking through notifications for any warnings / reasoning.
 
 ## I encounter odd String and XML errors intermittently when sending between channels
 
 Ensure you do not have a [xalan](https://mvnrepository.com/artifact/xalan/xalan) jar in your custom library. (_rogin_ to fill in what problems were presenting)
 
-## Performance metrics
+## Performance (and pricing?) metrics
+
+### AWS pricing for DB using RDS or EC2 cluster
+
+_chris_
+RDS and EC2 are roughly equivalent in terms of cost. We built most of our infrastructure before RDS was available and we are comfortable admin'ing it directly. We are looking at RDS as a way to reduce some of that admin burden but haven't moved, yet.
+
+### PG info
+
+_chris_ (March 2023)
+We run our PostgreSQL dbs on Intel because the instances have better network performance and our dbs are EBS-backed. But we run our Mirth servers on AMD because they are cheaper. The Graviton instances are even cheaper than that.
+(When I say "Mirth" I mean "Mirth Connect" and I only mean the Java process.)
 
 ### Improvements when pruning more often
 
@@ -270,11 +517,13 @@ _Anthony Leon_
 
 ## New functionality in Rhino v1.7.13
 
+The [How Do I](HowDoI.md) also has a section to determine which JS functions are available with each version of Mirth.
+
 (Rhino 1.7.12 is in Mirth 3.12.0, and Rhino 1.7.13 in Mirth 4.2, so it may have been included in the initial Mirth 4.x line)
 
 _agermano_: like I said, the `map[foo]` should work in your current mirth version (I've tested it with rhino 1.7.13, but not actually in mirth)
 when map is a `java.util.Map`
-in prior rhino versions a js object is implemented with `NativeObject` and a java Map would have been represented by `NativeJavaObject` (basically a wrapper class.) rhino 1.7.13 introduced `NativeJavaMap` as a subclass of `NativeJavaObject` that adds this behavior.
+in prior rhino versions a js object is implemented with `NativeObject` and a java `Map` would have been represented by `NativeJavaObject` (basically a wrapper class.) rhino 1.7.13 introduced `NativeJavaMap` as a subclass of `NativeJavaObject` that adds this behavior.
 Also `NativeJavaList`, which allows you to access a `java.util.List` by index like a js array instead of using the get method.
 
 ## Blank messages and mappings in dashboard
@@ -290,17 +539,42 @@ Solution: Be sure to undeploy the channel first as it resolved his issue.
 
 ## Channel development tips
 
-* Set your response data type to RAW. That will force your response transformer code to always execute no matter what. (_joshm_ 7 Dec 2022)
-** user's code to error after X send attempts was failing, needed the above [to resolve](https://github.com/nextgenhealthcare/connect/discussions/4795). (29 Dec 2022)
-* Prefer destination queueing over source queueing as source queueing will take a performance hit on deployment with its message recovery. See [here](https://gist.github.com/jonbartels/675b164000bfedd29a0a5f2d841d92fa). (forgot who provided this)
-* _agermano_: 'For all http listeners, since you can’t trust the sender to send the correct thing, set the incoming data type to RAW.' For example, given a HTTP Listener expecting HL7, Mirth attempts to serialize and pukes on invalid data. To allow a cleaner response message to be returned when various blank/invalid data is provided, set the incoming data type to RAW. Once validated, manually call the serializer for the desired data type. (User had an issue checking for blank HL7 data, so he needed this option.)
-* another option to above by _jonb_ and _agermano_
+### "Include Filter/Transformer"
+
+If you are queuing on a destination and it makes sense for your workflow, select "Include Filter/Transformer" in the queue settings. Then that script will execute in the queue thread(s) instead of the source's. (_narupley_)
+
+### Destination Set Filtering
+
+Given many destinations where most of them get filtered: to improve performance, you can instead use "Destination Set Filtering" in your source transformer. You can decide which destinations to exclude, and then those will not be committed to the database in the first place. That can greatly reduce the database load for a channel. This is described in the "Best Practices" section of the User Guide. (_narupley_)
+
+Summary for using this is
+
+1. create an additional channel at the end that is set to throw so admins review
+1. Default your removeAllExcept to the above channel
+1. Log a 'reason for filter' text
+1. be sure to
+
+### Set your response data type to RAW
+
+That will force your response transformer code to always execute no matter what. (_joshm_ 7 Dec 2022)
+
+This [resolved](https://github.com/nextgenhealthcare/connect/discussions/4795) a user's code problem: error after X send attempts.
+
+### Prefer destination queueing
+
+Prefer destination queueing over source queueing as source queueing will take a performance hit on deployment with its message recovery. See [here](https://gist.github.com/jonbartels/675b164000bfedd29a0a5f2d841d92fa). (forgot who provided this)
+
+### Set the incoming data type to RAW for all http listeners
+
+_agermano_: 'For all http listeners, since you can’t trust the sender to send the correct thing, set the incoming data type to RAW.' For example, given a HTTP Listener expecting HL7, Mirth attempts to serialize and pukes on invalid data. To allow a cleaner response message to be returned when various blank/invalid data is provided, set the incoming data type to RAW. Once validated, manually call the serializer for the desired data type. (User had an issue checking for blank HL7 data, so he needed this option.)
+
+Another option to above by _jonb_ and _agermano_
 
 1. Source raw inbound; source hl7 outbound.
-2. In the source transformer - check message len, if its zero or not HL7 or whatever.
-3. If its blank - then call destinationSet.removeAll(). this is superior to a filter; build a response messsage with the HTTP error you want; do some logging.
-4. If its not blank call the HL7 serializer and parse the message. Send it out of the source transformer. wrap the serializer call in a try/catch to send back a meaningful error message when the message is not blank, but fails serialization
-5. Destination takes hl7 as input so when the destination does actual work its got HL7.
+1. In the source transformer - check message len, if its zero or not HL7 or whatever.
+1. If its blank - then call destinationSet.removeAll(). this is superior to a filter; build a response message with the HTTP error you want; do some logging.
+1. If its not blank call the HL7 serializer and parse the message. Send it out of the source transformer. wrap the serializer call in a try/catch to send back a meaningful error message when the message is not blank, but fails serialization
+1. Destination takes hl7 as input so when the destination does actual work its got HL7.
 
 For #2 and #3 above, whether you use the source filter or destinationSet.removeAll() in the source transformer depends on whether you want your message to show as filtered or sent.
 
@@ -314,7 +588,7 @@ Initiator: _Rodger Glenn_, 2 Dec 2022
 _jonb_:
 
  1. have a convention
- 2. enforce it during code reviews
+ 1. enforce it during code reviews
  I really like the naming conventions that designate from_X_to_Y_#### where #### is a port.
 
 _Jarrod_:
@@ -355,3 +629,9 @@ Either a bug in the Mirth queries for map data, or perhaps it's the order of ope
 1. D20 response transformer runs <- responseMap is populated here
 1. Destination Chain completes
 1. Source looks at response map and sends responseMsg as a reply
+
+## Questions you were too afraid to ask
+
+### Multiple functions in a code template?
+
+Can I write multiple functions in a code template? Yes, as it's all compiled into one script.

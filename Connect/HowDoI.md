@@ -62,10 +62,55 @@ You could also just use the internal Mirth Connect classes directly like `var s3
 
 Though doing that could break your script in the future if we ever change stuff in that class
 
+## Backup my Mirth channels
+
+See [here](https://github.com/nextgenhealthcare/connect/discussions/5374#discussioncomment-3531926) for a list of options used by experienced users.
+
+## Fix a channel's "Last Modified" changing every minute
+
+_Matt Weig_
+Looking at the channels view, I have a couple channels where the "Last Modified" date/time changes every minute. However nothing is actually changing on the channel itself.
+Happens on 3.6.1 and 4.2
+
+_Richard_
+The channel export was missing the "lastModified" element. Adding it and re-importing resolved. No one dug into how Mirth created an export with that field missing.
+
+## Know which JS functions are available with my version of Mirth
+
+For example, I want to use `array.includes()`.
+
+See [here](https://mozilla.github.io/rhino/compat/engines.html) for Rhino version implementations. To continue our example, `array.includes()` started in Rhino v1.7.12. From here you can either match your Rhino's versioned jar under `mirth_home/server-lib/`, e.g. `rhino-1.7.13.jar`, or click [here](https://github.com/nextgenhealthcare/connect/blob/development/client/.classpath), then select the drop down for the version you want to investigate. We can see that the [3.10.x](https://github.com/nextgenhealthcare/connect/blob/3.10.x/client/.classpath) line first began using Rhino v1.7.12.
+
+MC v3.12 uses Rhino v1.7.12.
+MC v4.2 uses Rhino v1.7.13.
+
+## Include a polyfill for `array.includes()`
+
+_chris_:
+
+````javascript
+// Mirth 3.6.0 and earlier do not support Array.includes, so we add it ourselves.
+if(!Array.prototype.includes) {
+  logger.info('Installing Array.prototype.includes');
+  Array.prototype.includes = function(el) {
+    for(var i=0; i<this.length; ++i) {
+      if(this[i] == el) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+````
+
+## Handle a custom SOAP message
+
+You can use a Web Server Listener for the custom SOAP message, but it will need it's own Java class. But you can emulate that functionality in a regular HTTP Listener.
+
 ## Send fileset daily via Mirth
 
 _Kit_ on 7 March 2023
-is it possible to get Mirth to send the same set of messages every day without using another tool like windows scehuler to do the scheduling?
+is it possible to get Mirth to send the same set of messages every day without using another tool like windows scheduler to do the scheduling?
 So we have a few servers that gets redeployed every day with their sample data getting reset each time.
 I want to be able to send a set of HL7 to some of these servers that will create a bunch of ie. clinic appointments over the next month or so
 so I think ideally I would have a bunch of text files with the messages in them, then each day Mirth would pick them up, go through some transforms etc. to ensure the dates are correct, and then send them onwards
@@ -82,7 +127,7 @@ yup
 ## Export DICOM images
 
 _Gio_
-Do we know why this happens? "Error: Cannot export DICOM attachments."
+Do we know why this happens? "`Error: Cannot export DICOM attachments.`"
 when I try to open the attachment it works
 
 _pacmano_
@@ -163,7 +208,7 @@ Is the responseMap visible from the source transformer? Looks like the answer is
 
 ## Add HL7 fields out of order
 
-[FixHL7NodeOrder.js](FixHL7NodeOrder.js) copied from [this comment](https://github.com/nextgenhealthcare/connect/issues/633#issuecomment-626857519)
+[FixHL7NodeOrder.js](FixHL7NodeOrder.js) copied from [this comment](https://github.com/nextgenhealthcare/connect/issues/633#issuecomment-626857519). [This code template](https://github.com/nextgenhealthcare/connect-examples/tree/master/Code%20Templates/Fix%20HL7%20Node%20Order) may be more up-to-date and complete.
 
 Usage example
 
@@ -177,11 +222,11 @@ Originator: _Anibal Jodorcovsky_, March 2023
 
 His client is sending this faulty data, and while they're tasked with fixing, he is providing an interim solution.
 
-I have somebody sending me "invalid" HL7 with & in one of the segments. ORC-8.1 is this "Printset: CTA HEAD & NECK W/CONTRAST". So, when I extract `msg['ORC']['ORC.8']['ORC.8.1']` I get this `<ORC.8><ORC.8.1><ORC.8.1.1>Printset: CTA HEAD </ORC.8.1.1><ORC.8.1.2> NECK W/CONTRAST</ORC.8.1.2></ORC.8.1></ORC.8>`.  I want to be able to obtain the string `Printset: CTA HEAD & NECK W/CONTRAST`.
+I have somebody sending me "invalid" HL7 with "&" in one of the segments. `ORC-8.1` is `Printset: CTA HEAD & NECK W/CONTRAST`. So, when I extract `msg['ORC']['ORC.8']['ORC.8.1']`, I get `<ORC.8><ORC.8.1><ORC.8.1.1>Printset: CTA HEAD </ORC.8.1.1><ORC.8.1.2> NECK W/CONTRAST</ORC.8.1.2></ORC.8.1></ORC.8>`.  I want to be able to obtain the string `Printset: CTA HEAD & NECK W/CONTRAST`.
 
 _chris_ IMO best place to do this is in the preprocessor. Just look for that exact string and replace it.
 
-_MikeH_ with the link to [this gist](https://github.com/nextgenhealthcare/connect-examples/tree/master/Code%20Templates/Join%20HL7%20Subcomponents) and the following:
+_MikeH_ with [this gist](https://github.com/nextgenhealthcare/connect-examples/tree/master/Code%20Templates/Join%20HL7%20Subcomponents) and the following:
 
 ````javascript
 //example usage
@@ -209,8 +254,7 @@ for each(obx in msg..OBX)
 ````
 
 _pacmano_
-If xml/hl7 I delete via for loop in reverse order.
-deleting a segment messes up the array offset which does not happen if you do it in reverse order
+If xml/hl7, I delete via for loop in reverse order. deleting a segment messes up the array offset which does not happen if you do it in reverse order,
 
 _agermano_:
 
@@ -222,24 +266,17 @@ for each (var obx in msg.OBX) {
 }
 ````
 
-Without the index you are deleting the reference to the xml object. With the index tells it to delete from the object to which obx refers.
-you don't need a counter, just always use index 0 in the for each loop, and it will delete the current object
-because e4x is weird
-e4x intentionally blurs the line between a single object, and a list with a single element
-it also does a lot of magic so when you delete an element from a document, it automatically reindexes all of the other children so as to not leave any gaps
-if you have a javascript `array [1,2,3,4,5]`, and you `delete array[1]`, you'll end up with `[1,undefined,3,4,5]`
-e4x will shift everything following the deleted element to the left, though
-and in e4x, each element is aware of its position in the parent node
-which can be used via xmlNode.childIndex()
-those child indexes all get updated after a delete (which is part of the reason e4x is slow with large documents)
-if you're deleting in an indexed for loop, it's definitely better to start from the back and work forward
-otherwise you need to decrement your index after you delete so that when it increments at the end of the loop it reads the same element (due to the left shift thing that happens)
-in a normal javascript array it's better to just use a filter rather than delete in a for loop
-I did make an xml filter function that could work here, too. I always try to avoid deletes.
+Without the index you are deleting the reference to the xml object. With the index tells it to delete from the object to which obx refers. you don't need a counter, just always use index 0 in the for each loop, and it will delete the current object, because e4x is weird. e4x intentionally blurs the line between a single object, and a list with a single element. it also does a lot of magic so when you delete an element from a document, it automatically reindexes all of the other children so as to not leave any gaps.
+
+if you have a javascript `array [1,2,3,4,5]`, and you `delete array[1]`, you'll end up with `[1,undefined,3,4,5]`. e4x will shift everything following the deleted element to the left, though and in e4x, each element is aware of its position in the parent node which can be used via xmlNode.childIndex().
+
+those child indexes all get updated after a delete (which is part of the reason e4x is slow with large documents). if you're deleting in an indexed for loop, it's definitely better to start from the back and work forward, otherwise you need to decrement your index after you delete so that when it increments at the end of the loop it reads the same element (due to the left shift thing that happens).
+
+in a normal javascript array it's better to just use a filter rather than delete in a for loop. I made an xml filter function that could work here, too. I always try to avoid deletes.
+
 [Connect Example - Filter XMLLists](https://github.com/nextgenhealthcare/connect-examples/tree/master/Code%20Templates/Filter%20XMLLists)
-If all of your OBX segments are contiguous, you can use this
-`msg.OBX = xFilter(msg.OBX, obx => condition)`
-it's one of the few functions I have in my global code template library
+
+If all of your OBX segments are contiguous, you can use this: `msg.OBX = xFilter(msg.OBX, obx => condition)`. it's one of the few functions I have in my global code template library
 
 ## Skip X rows in a transformer
 
@@ -247,6 +284,7 @@ _daniella_ 1 March 2023
 Issue setting up the transformer steps when processing XML
 
 _agermano_ You can run in batch mode as there is a "number of header records" property so that it doesn't create messages container the column names.
+
 In this case I'd probably put a javascript step before your iterator with delete msg.row[0]. That should remove the first row from msg, and since you are dealing with xml, it will shift the remaining rows and reindex them. A regular javascript array doesn't do that.
 
 ## Embed Base64 image into PDF
@@ -279,7 +317,7 @@ Then set
 ````
 
 _The first line adds the "data" protocol handler to the search path used by the URL class.
-The second line appends the jar to the end of the classpath at startup. This is an option used by the install4j launcher and not directly passed to the jvm_
+The second line appends the jar to the end of the classpath at startup. This is an option used by the install4j launcher and not directly passed to the jvm._
 
 ### Option 3
 
@@ -291,6 +329,12 @@ Use the newer libraries
 See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/10305-access-request-headers-in-http-listener?p=69586#post69586).
 
 ## Hash files (MD5 or other)
+
+### Option 1 -- v4.2+
+
+(VERIFY) As of v4.2, Mirth will auto-generate a message hash value (which can be pulled from the right-side of the the UI as `Hash`), and users can access the Mirth hashing util class to perform on desired message segments.
+
+### Option 2 -- pre-v4.2
 
 See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/13366-md5-hashing?p=81191#post81191) on using Guava.
 
@@ -316,9 +360,13 @@ User wants to check for duplicate messages in a given 12 hour period. (11 Jan 20
 
 See [_agermano_](<https://forums.mirthproject.io/forum/mirth-connect/support/19116-filter-smtp-destination-unique-only?p=174475#post174475>)'s code snippet using guava which is included with Mirth. Guava allows expiring entries in multiple ways.
 
+## Implement JWT in Mirth
+
+See [this solution](https://github.com/nextgenhealthcare/connect/discussions/5503#discussioncomment-4031411).
+
 ## Use CryptoJS library
 
-See [here](https://forums.mirthproject.io/forum/mirth-connect/support/174848-use-require-from-node-js?p=174858#post174858).
+See [here](https://forums.mirthproject.io/forum/mirth-connect/support/174848-use-require-from-node-js?p=174858#post174858) and [sample calling code](https://github.com/nextgenhealthcare/connect/discussions/5503).
 
 ## Use JSch library
 
@@ -399,10 +447,10 @@ var attachmentContent = getAttachment(chanId, messageId,attachmentId,base64Decod
 
 Issue: user expressed using routeMessage() didn't send 'sourceChannelId(s)' and 'sourceMessageId(s)' like direct channel-to-channel does.
 
-Solution #1: It's a [requested feature](https://github.com/nextgenhealthcare/connect/issues/5293)
-Solution #2: create a new destination that filters on the existing logic you're using for routeMessage()
-Solution #3: Link in Solution #1 also has a code solution, but it's a manual addition.
-Solution #4: another manual addition
+* Solution #1: It's a [requested feature](https://github.com/nextgenhealthcare/connect/issues/5293)
+* Solution #2: create a new destination that filters on the existing logic you're using for routeMessage()
+* Solution #3: Link in Solution #1 also has a code solution, but it's a manual addition.
+* Solution #4: another manual addition
 
 ````javascript
 var attributes = new Packages.java.util.HashMap();
@@ -511,14 +559,14 @@ const appDtStr = String(zonedDateTime.format(writeFmt))
 
 ## Auto-generate value for MSH.10
 
-Initiator: Nathan Corron
+Initiator: _Nathan Corron_
 anyone know if there is a function in mirth to get an incrementing unique number that could be used for say MSH-10?  Needs to be numeric
 
 ````javascript
 Date.now()
 ````
 
-See [JS example](https://jsfiddle.net/pvj79z8s/) and [docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now)
+See [JS example](https://jsfiddle.net/pvj79z8s/) and [docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now).
 
 ## Limit number of messages processed
 
@@ -535,16 +583,16 @@ _jonb_'s other ideas
 
 ## Access global map concurrently
 
-Summary: don't do it
+(_ed note_: may be worthwhile to review [this code template](https://github.com/nextgenhealthcare/connect-examples/tree/master/Code%20Templates/Thread-safe%20get%20or%20create%20from%20globalMap) against the response below.)
+
+Summary: don't do it, ultimately JS should NOT be considered thread-safe
 
 _chris_ was accessing the global map from channel deployments after noticing values not being in there when they should have been.
 
-Ultimately JS should NOT be considered thread-safe.
-
 Options listed
 
-* replacing the JS map with java.util.ConcurrentHashMap
-* _chris_: When I create the map initially, I can attach a get method to it which just turns-around and fetches the thing via property-access. That will allow me to go and hunt-down all the references in my js code and replace map[foo] with map.get(foo). Then I can swap-out the object for the type I really want. In the meantime I still have all kinds of concurrency issues, but I don't have to stop-the-world to re-write all that code. Yep, looks like object.get doesn't exist and defining it works as expected.
+* replacing the JS map with `java.util.ConcurrentHashMap`
+* _chris_: When I create the map initially, I can attach a `get` method to it which just turns-around and fetches the thing via property-access. That will allow me to go and hunt-down all the references in my js code and replace `map[foo]` with `map.get(foo)`. Then I can swap-out the object for the type I really want. In the meantime I still have all kinds of concurrency issues, but I don't have to stop-the-world to re-write all that code. Yep, looks like `object.get` doesn't exist and defining it works as expected.
 
 ## Create index on metadata column(s)
 
@@ -608,7 +656,7 @@ return df.format(sumOfCharges);
 
 ## Create case-insensitive JSON fields
 
-_itsjohn_: Is there a way to make JSON payload fields case insensitive when mapping in Mirth so I can write msg['foo'] and Mirth accepts {"foo":""}, {"FOO":""} and {"Foo":""}
+_itsjohn_: Is there a way to make JSON payload fields case insensitive when mapping in Mirth so I can write `msg['foo']` and Mirth accepts `{"foo":""}`, `{"FOO":""}` and `{"Foo":""}`.
 
  _agermano_ 22 Nov 2022
 
@@ -852,6 +900,8 @@ mc.message_id = target.message_id and mc.metadata_id=target.metadata_id and mc.c
 
 ## Understand the difference between XML's name() vs localName()
 
+Summary: you'll likely need `localName()`
+
 20 Dec 2022 by _agermano_
 
 ````javascript
@@ -872,6 +922,7 @@ xml
 ````
 
 ````javascript
+//introduce a namespace
 js> default xml namespace = "uri:test"
 js> msg = <xml><a/></xml>
 <xml xmlns="uri:test">
@@ -889,7 +940,7 @@ xml
 
 _Zivan_ 1 March 2023: I ran into a strange issue while trying to reprocess a message with an attachment using the Interoperability Connector.
 
-_jonb_ [Doco](https://docs.nextgen.com/bundle/Connect_Interoperability_Connector_Suite_User_Guide/page/connect/connect/topics/c_handling_multipart_payloads_attachments_Interop.html)
+_jonb_ [User Guide link](https://docs.nextgen.com/bundle/Connect_Interoperability_Connector_Suite_User_Guide/page/connect/connect/topics/c_handling_multipart_payloads_attachments_Interop.html)
 
 _agermano_ and _narupley_ In the case of this connector, it's probably not reconstructing the original multipart message so that it can be torn apart again by the connector since the needed information isn't in the source raw data.
 When reprocessing it should "reattach" any attachments
@@ -958,3 +1009,88 @@ if you want 10 threads in the downstream channel, you'll either need to enable t
 With the source queue on, it will accept messages as fast as it can and distribute them among the source threads you have defined. With the source queue off, the 10 threads will be a maximum, but if there are only 5 threads sending messages synchronously, then it will only be using 5/10 threads at a time.
 
 Either option should allow the file reader to generate the messages much faster without waiting for the previous message to process.
+
+## Pass environment vars from AWS or Docker
+
+_Brandon C_
+Anyone recommend a way to pass in environmental values from like aws or docker etc that can insert values in the config map?
+
+_jonb_:
+
+* Write out `configuration.properties` with what you want
+* Change to storing the configmap in the DB and INSERT what you want to the DB by flipping __configurationmap.location__ in `mirth.properties` to __database__
+* Alter the [entrypoint.sh script](https://github.com/nextgenhealthcare/connect-docker) to take your env vars and poke the file or DB
+* [Docker Secrets](https://github.com/nextgenhealthcare/connect-docker#using-docker-secrets-) is new to me and interesting, but it only supports `mirth.properties` and not `configuration.properties`
+
+Brandon C
+what if i add more enviroment vars to the docker compose. could i pull those into the config map file some how
+oh ok so ill do a __EXTRA-VAR and say it has "stuff" . I then have to add code in that build file script
+
+jonb
+da
+I might suggest `MIRTH_CONFIGMAP_VARNAME`
+An example to build from is [here](https://github.com/nextgenhealthcare/connect-docker#other-mirthproperties-options-) that defines `_MP_some_thing` and will read that prefix and parse the value and write it to `mirth.properties`, you want the same thing but for `like_CP_some_var_maybe_dont_call_it_CP`.
+Generalize [lines 92-135](https://github.com/nextgenhealthcare/connect-docker/blob/0138af47317220b685be3771d938bf9403fd33c9/entrypoint.sh#L92) into a function that takes a prefix and file as an argument, then call it for `_MP` for `mirth.propertis` and `_CP` for `config.props`
+
+## Choose custom logic per deployment environment
+
+_itsjohn_
+Our channels have custom logic for choosing an API based on a field value in prod which is not in stage. In an effort to standardize our mirth channel, we were planning to use a global map environment variable to run the custom code only in prod. But I wanted to check if there is a better way of if we can avoid having to write an if condition for the environment check for any environment specific custom code
+Credentials
+But that api key in prod changes depending on field values…currently there are 6 categories of field values that can have a unique api key
+The end goal is to make both environment channels identical to promote a CI/CD pipeline
+So in test and uat, we just have 1 api key
+In prod, we have a switch case that has a field value mapped to each unique api key that it belongs to
+
+_jonb_
+Oh yea use the config map
+
+_RunnenLate_
+We are using a global configure that specifies the environment like you are trying to do.
+We did have configurations like that where we specified different functions or object lists but in our company if we have to touch code in any way we have to go through a whole review processes and it takes weeks.  since the configuration map is considered a "configurations change" and not a "code change" it's much easier and quicker to get approval for updating that. This is what influenced us to go that route. You might want to take that into consideration when picking which way you want to go.
+
+_pacmano_
+We do what @RunnenLate does. and all other items are sourced from a db not stored in `$cfg` for the most part. On engine (or channel) deploy, multi tenant / config stuff gets put in `$g`. That includes endpoints, etc.
+
+## Fix a double-processed attachment
+
+_jonb_
+A coworker copy-pasted a message with an attachment ID token in it instead of reprocessing. This led to the new message attachment content being literally `${ATTACH:sdfdasfdsfd}` - e.g. `OBX|1|2|3|4|^application/pdf^${ATTACHMENT:adsfasdfds}||||`
+Obviously “reprocess instead of copy-paste” is the right solution.
+Is there some way to like double decode attachment tokens? Would using the long-form attachment token prevent this?
+
+_RunnenLate_
+you can specify the channel and message ID in that
+`getAttachment(channelId, messageId, attachmentId, base64Decode)`
+you can use `getAttachmentIds(channelId, messageId)` to get the attachmentId
+so it would be something like `getAttachment(channelId, messageId, getAttachmentIds(channelId, messageId), false)`
+
+## Add footer to the PDFs generated by Mirth
+
+_mkopinsky_
+Is there a way to add a footer to the PDFs generated by Mirth? since there's no way in HTML I assume there's no way in the outputted PDF as well.
+(the alternative is to just put the MRN on each page, but since the document is wrapping into 3 pages, that's a bit annoying)
+
+_jonb_
+See [here](https://forums.mirthproject.io/forum/mirth-connect/support/8370-pdf-header-footer-success) via [here](https://forums.mirthproject.io/forum/mirth-connect/support/178127-footer-on-bottom-from-page-in-document-writer-pdf-creator?p=178128#post178128)
+
+Looks like HTML and CSS then you can test it using the “print” type. I think thats possible in most browsers’ dev tools.
+So the direct answer to your question is give your PM a login to Mirth and an HTML editor and tell them to SHOW you what they want.
+
+_mkopinsky_
+there is a way in dev tools to get print layout by [using a hidden button](https://stackoverflow.com/questions/9540990/using-chromes-element-inspector-in-print-preview-mode/).
+
+## Get channel name by channel ID
+
+_Anibal Jodorcovsky_
+Hi all - I need to be able to extract the source channel name on a message that has been received after a few hops. This is the message, and what I’m looking for (in code) is the channel name of the channel ID highlighted:
+
+_jonb_
+So you want a method like `getChannelNameFromId`?
+
+_Anibal Jodorcovsky_
+yes, and I assume the id in this case would be: `sourceMap.get[‘sourceChannelIds’](0)` ?
+Just to note that if the message comes directly from one source, the sourceChannelIds is actually null… and I just need to get the id from the sourceChannelId
+
+_tiskinty_
+`ChannelUtil.getChannelName(mychannelId);`
