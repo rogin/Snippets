@@ -14,7 +14,7 @@ trace-command -expression {"g*","s*" | Get-Alias } -name parameterbinding -pshos
 Get-TraceSource
 ````
 
-## Updating Microsoft Store apps
+## Updating `Microsoft Store` apps
 
 From [here](https://social.technet.microsoft.com/Forums/windows/en-US/5ac7daa9-54e6-43c0-9746-293dcb8ef2ec/how-to-force-update-of-windows-store-apps-without-launching-the-store-app):
 
@@ -196,6 +196,7 @@ Enter-PSSession -computername $env:COMPUTERNAME -Configuration PowerShell.7
 - Can I select XML's #text() in a SelectNode()?
 - Can I create a cycled iterator that repeats a list? there's no 'yield' equivalent. I want `('red','green','blue')` to cycle forever.
 - Can I iterate with an index like other languages -- `for (index, value) in list.something()`. There's a [language request ticket](https://github.com/PowerShell/PowerShell/issues/13772) for \$PSIndex that was closed.
+- I need a PS script to run as admin on a fresh Win10 box to keep the system updated. How to configure the script to allow user to click .ps1 file to run, and have it prompt for creds? Adding `#Requires -RunAsAdministrator` did not work, plus the default PS v5.1 running it failed to parse simple lines correctly, e.g. "& control update" to open the Windows update panel.
 
 ## Review one liners
 
