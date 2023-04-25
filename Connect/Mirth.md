@@ -196,7 +196,64 @@ If you have one thread, aren't using destination queuing, and have a slow destin
 
 When you are not using 'wait for previous destination' and you are not using destination queuing, then each destination chain gets its own thread except for one (I think the last one) that runs on the same thread as the source connector.
 
+## Good practice for configuring the '`Max Processing Threads`'
+
+_Kirby Knight_
+If you have a channel where message order doesn't matter, what is a good practice for configuring the '`Max Processing Threads`'?
+
+_tiskinty_
+I typically try to keep max threads to the lowest value possible while being able to keep up during the majority of the time. One thing to note about threads though is that it appears that the channel will keep that max number of threads constantly "active" regardless of if they are being used currently, so you can potentially overwhelm your system if you go too high
+
+_agermano_
+if you have 5 single threaded channels calling this one (channel), setting your threads higher than 5 won't do anything beneficial. setting it to 2 would just mean that only 2 channels at a time could have an active request. The other channels would patiently wait for them to finish.
+
+_chris_
+The default value for `kernel.threads-max` depends upon the system memory size. My EC2 instances with 7.5 GiB of RAM tells me I have 7615 max-threads. Then you have several threads per-channel even if "`Max Processing Threads`" is set to 1 because there's at least one for the Source (depending on the source; I think ChannelReaders don't actually allocate a thread, and the sending channel lends the thread to the target-channel as the source-thread), and I think one per destination or maybe one for all destinations -- I'm not entirely sure. So if you take 10 channels and change "`Max Processing Threads`" from 1 to 10 you may take a server which is using 20 threads and bump that up to over 100.
+
+_agermano_
+I'd have to do some digging on this. I think the calling channel directly dispatches the message, where as other connectors spin up additional threads to do the actual work of acquiring the message prior to dispatch, but I think concurrent message processing is still limited by the number of source threads. Obviously if the source queue were turned on, it would require source threads to process anything. It's important to understand where your bottlenecks are, because there will be a point where additional threads reduce rather than improve performance, and that's probably way before you'd come close to hitting any limit.
+
+## TODO: truthy-ness with JS primitives and Java objects
+
+[Long-ass thread](https://mirthconnect.slack.com/archives/C02SW0K4D/p1681915318018659) on truthy-ness with JS primitives and Java objects.
+
+## How threads work with the channel writer/vmrouter calls
+
+_jonb_
+Is there a good writeup of how threads work with the channel writer/vmrouter calls? The gist I remember is that the destination writer runs the source connector in the destination thread. I need to explain this to a teammate and it is something I “just know” and I cannot word good to articulate it to my peer. this guy [says](https://github.com/nextgenhealthcare/connect/discussions/5346#discussioncomment-3374538) the same thing but didn’t cite sources. [still](https://github.com/nextgenhealthcare/connect/discussions/5296#discussioncomment-3223103) no citations. It should be demonstratable with a destination channel writer then the source connector of the target channel just has a sleep. I had to chase this down at Zen or prove a friend wrong for the lulz
+
+_agermano_
+both a channel writer and vmrouter end up calling `EngineController.dispatchRawMessage`. it gets interesting. Everything converges [here](https://github.com/nextgenhealthcare/connect/blob/development/donkey/src/main/java/com/mirth/connect/donkey/server/channel/Channel.java#L1249) whether you call `routeMessage` to dispatch or the http listener's handler tries to dispatch a message. there is a Set of dispatchThreads, but it adds the current thread to the Set.
+
+## Can't run MCAL on mac
+
+_mklemens_
+for those with a mac:
+`open -a Mirth\ Connect\ Administrator\ Launcher.app --args -k`
+but I do also believe that me not having javafx installed is the reason why I cant run the jar, but doing it with this other command I believe uses the built in runtime.
+
 ## MC plugin ideas
+
+### Image conversion
+
+_RunnenLate_
+Does anyone use mirth for image conversion?
+
+_tiskinty_
+I've used it for image compression before.
+
+_dforesman_
+I have used it to call imagemagick to convert to PDF
+
+_RunnenLate_
+I'm using the imageio library to convert PDF to TIF and visa versa. I'm just wondering if it's something that should be integrated into Mirth... thinking about making a plugin maybe.
+
+### Mirth UIs from JSON config
+
+_jonb_
+I have another good idea that I’m probably never going to implement.
+Inspired by Josh's idea - <https://github.com/nextgenhealthcare/connect/issues/5749>
+I think the hard part of writing plugins is the UI. IIRC the current standard is still “use Netbeans for Swing”. What if there was a sample plugin where the UI was just “heres a big text area, enter a JSON blob in that for your config object” then the plugin is responsible for parsing the JSON and applying its properties. This would let the developer focus on making the libraries and connector operation work well separately from the quirky bits of the Swing UI.
 
 ### Channel dependency graph
 
@@ -245,6 +302,7 @@ To support the filtered view either the client has to … do magic.. IDK… or t
 * [NextGen](https://www.nextgen.com/)
 * [InterfaceMonitor](https://www.interfacemonitor.com/) / [xc-monitor](https://mirth-support.com/xc-monitor)
 * [MirthSync](https://saga-it.com/tech-talk/2019/03/15/mirthsync+installation+and+basic+usage) is [on GitHub](https://github.com/SagaHealthcareIT/mirthsync), is it a freemium model?
+* Mirth Connect User Group maintains a [list](https://www.mcug.org/mirthvendors)
 
 ## Pruning logic clarification
 
@@ -607,6 +665,20 @@ I like to also start any channel that listens on a port with said port number. T
 * Set "page size" to 1 to greatly speed up queries you expect to contain only one result. (_pacmano_ 7 Dec 2022)
 * Search with just the “has errors” checkbox for an error. I’ve seen a situation where you can get an error but the message status doesn’t get set to ERROR (_joshm_)
 
+## Response transformer fires for an http sender for a 500
+
+_pacmano_
+Why would a response transformer fire for an http sender for a 500? The response transformer is not set to raw.
+
+_jonb_
+Did the server return a 500 and content whose content type matched the expected response type?
+
+_pacmano_
+ah… `application/problem+json`;
+
+_agermano_
+Content type shouldn't matter. Any content sent at all should trigger it. The wrong type would throw a parse error at the start of the transformer.
+
 ## What does Mirth encrypt?
 
 Jan 2023 timeframe
@@ -614,6 +686,30 @@ Jan 2023 timeframe
 _chris_: Does anyone know exactly what Mirth encrypts when you enable "Encryption" for a channel?
 
 (nothing back yet that he wanted to preserve here)
+
+April 2023 timeframe
+
+_tiskinty_
+I've used it, though I was not looking for database level so much as limiting the info available via the mirth api
+
+_chris_
+I never bothered to check: Mirth's API won't return a decrypted message to a client?
+
+_tiskinty_
+if includeContent is true, the API will return an encrypted string in the message's place. I can't speak to the security aspect of it, but it's plenty to prevent the average customer service rep from getting too much info.
+
+_chris_
+I would imagine that most environments won't give access to the database to anyone who isn't authorized to view that patient data. So basically the DBAs are okay to see that data, even if theoretically they should not have access to it. (Same with API access.)
+
+_agermano_
+I didn't realize the API returned the message encrypted. So it ends up getting decrypted on the client side? that seems less secure lol.
+
+_chris_
+I suspect it would only be decryptable if the client also had the key. If the API is coughing-up security keys that would be a huge problem IMO.
+
+_agermano_
+  13 hours ago
+It looks like [it does decrypt data](https://github.com/nextgenhealthcare/connect/blob/development/donkey/src/main/java/com/mirth/connect/donkey/server/data/jdbc/JdbcDaoFactory.java#L59) when reading message content from the database by default. However, the controller that handles the API call to get multiple messages [intentionally tells it not to decrypt when includeContent is selected](https://github.com/nextgenhealthcare/connect/blob/development/server/src/com/mirth/connect/server/controllers/DonkeyMessageController.java#L202-L207). I confirmed GET `/channels​/{channelId}​/messages` with `includeContent=true` returns encrypted content, but GET `/channels​/{channelId}​/messages​/{messageId}` returns decrypted content. I have the feeling the former is used when exporting messages, and you would likely decrypt on import. I don't think the message browser includes the content when making the first call, so it would decrypt on demand when you clicked on a message to view the content.
 
 ## Why do I see 'dxx' set in responseMap within the Source mappings?
 

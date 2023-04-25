@@ -6,6 +6,149 @@ As the main page was getting too large, this will house the samples and links to
 
 _jonb_: Given __<https://www.mirthcorp.com/community/forums>__/showthread.php?t=8783, replace with __<https://forums.mirthproject.io>__/showthread.php?t=8783
 
+## Use Derby DB in production environment
+
+Don't, not even for development.
+
+_jonb_: Postgres is what NextGen uses internally in their paid appliance offerings
+
+## Determine the Message Pruning setting of each channel
+
+See [here](https://github.com/nextgenhealthcare/connect/discussions/5389#discussioncomment-3497635).
+
+## Trigger channel alert that does NOT match a regex (using negative lookahead)
+
+_Shane Dewitt_
+I have a channel alert that triggers off a regex. I want to create a second alert to trigger off any error that does not contain the regex string from the previous alert.
+
+_agermano_
+you could probably use negative lookahead
+Try this `(?s)\A(?:(?!Failed to Save Report because Error Object was not available\.).)*\Z`
+[Sample regex](https://regex101.com/r/BUE9s7/1)
+[SO link](https://stackoverflow.com/questions/406230/regular-expression-to-match-a-line-that-doesnt-contain-a-word)
+you can use `^` and `$` instead of `\A` and `\Z` when the `m` flag is not set, but I don't know what flags mirth uses by default.
+
+## Grab channels stats using API via JS
+
+_stormcel_
+I usually hit the Mirth API from a HTTPS destination and process the results in a further destination, but for this project I need a javascript solution to grab the stats from the Mirth API.
+
+* grab channel stats from an external mirth server
+* initially used JS reader to make the channel less 'chatty'. it's supposed to collect stats every 2 hours, but only email twice a day. I was hoping that I could use `destinationSet` logic to control the overhead.
+
+_pacmano_
+[SO link](https://stackoverflow.com/questions/61649942/mirth-http-post-request-with-parameters-using-javascript)
+That should help - but it’s truly easier just to call it in a destination.
+
+_joshm_
+this should get you logged in, then you can use the jsession cookie to make subsequent requests.
+
+````javascript
+function loginMirth(url, body){
+ var provider = new Packages.org.apache.http.impl.client.BasicCredentialsProvider();
+ var credentials = new Packages.org.apache.http.auth.UsernamePasswordCredentials(configurationMap.get("mirthAPIUsername"), configurationMap.get("mirthAPIPassword"));
+ provider.setCredentials(Packages.org.apache.http.auth.AuthScope.ANY, credentials);
+
+ var sslContext = Packages.org.apache.http.conn.ssl.SSLContexts.custom()
+        // .loadKeyMaterial(keyStore, keyPassphrase.toCharArray())
+         .loadTrustMaterial(null, new Packages.org.apache.http.conn.ssl.TrustSelfSignedStrategy())
+         .build();
+
+ var sslsf = new Packages.org.apache.http.conn.ssl.SSLConnectionSocketFactory(sslContext, null, null, new Packages.org.apache.http.conn.ssl.NoopHostnameVerifier());
+
+ // create Http Client
+ var httpClient = Packages.org.apache.http.impl.client.HttpClients.custom()
+  .setSSLSocketFactory(sslsf)
+  .setDefaultCredentialsProvider(provider)
+  .build();
+
+ // create http get request using url
+ var request = new Packages.org.apache.http.client.methods.HttpPost(url);
+ request.setConfig(getRequestConfig());
+ // set auth header with bearer token
+ request.addHeader('Content-type', 'application/x-www-form-urlencoded');
+ request.addHeader('X-Requested-With', 'OpenAPI');
+ request.addHeader('accept', 'application/xml');
+
+ if(body != null){
+  var entity = new Packages.org.apache.http.entity.StringEntity(body); 
+  request.setEntity(entity);
+ }
+ // execute http get
+ var resp = httpClient.execute(request);
+
+ // check response
+ var statusLine = resp.getStatusLine();
+ var statusCode = statusLine.getStatusCode();
+ var statusReason = statusLine.getReasonPhrase();
+ if(statusCode >= 300){
+  logger.error('failed to call loginMirth, status = ' + statusReason + ', code = ' + statusCode);
+  throw "Failed to execute HTTP Post. Status Code: " + statusCode + ". Reason: " + statusReason + ". Response: " + Packages.org.apache.commons.io.IOUtils.toString(resp.getEntity().getContent(), "UTF-8");
+ }
+ var header = resp.getFirstHeader("Set-Cookie").getValue()+"";
+ var jsession = header.split("=")[1].split(";")[0];
+ //TODO: accept a parameter for the `$g` var name to put
+ globalMap.put("jsession", jsession);
+ return jsession;
+}
+````
+
+_agermano_
+You could probably do this with two destinations. have the SMTP destination depend on the stats collection destination, but remove the SMTP destination from the destinationSet on the runs where you don't want it to fire off an email.
+
+_pacmano_
+I run a channel every minute that populates a `$g` var with stats, joining the channel ID to its name. Then a channel the checks errors counts and emails on some threshold and sends a stat email based on a configurable threshold. Other channels may be interested in that `$g` var also. if an error alert has been sent once, it will not send again (escalation is handled in another system). I don’t call the API via JS, instead use two destinations (one to get stats, one to get list of channels to map UID to name). I hit channels to get all channels then:
+
+````javascript
+$c('array_of_stats',
+JSON.parse(responseMap.get('api/channels/statistics').getMessage()).list.channelStatistics.map(function (stat) {
+  return {
+    // channelId: stat.channelId,
+    name: msg.map.entry.find(ele => ele.string[0] === stat.channelId).string[1],
+    received: stat.received,
+    sent: stat.sent,
+    error: String(stat.error), // I don’t remember why String() was necessary
+    filtered: stat.filtered,
+    queued: stat.queued
+  }
+})
+)
+````
+
+i.e. get the response from the stats call and fix it up with the actual channel name. The above code is in the second destination's response transformer. In my prod code, I also sort that array by number of errors, build an html email, and send it with only the channels that meet the error threshold.
+
+## Convert PDF to TIF
+
+_pacmano_
+no extra libraries needed, mirth 4.0.1
+
+````javascript
+var PDFRenderer = Packages.org.apache.pdfbox.rendering.PDFRenderer;
+var PDDocument = Packages.org.apache.pdfbox.pdmodel.PDDocument;
+var BufferedImage = Packages.java.awt.image.BufferedImage;
+var ImageIO = Packages.javax.imageio.ImageIO;
+var File = Packages.java.io.File;
+
+// Function to convert PDF to TIF
+function convertPdfToTif(pdfPath, outputDir) {
+    var document = PDDocument.load(new File(pdfPath));
+    var renderer = new PDFRenderer(document);
+    var pageCount = document.getNumberOfPages();
+
+    for (var i = 0; i < pageCount; i++) {
+        var image = renderer.renderImageWithDPI(i, 150); // Render the PDF page at 150 DPI
+        var outputFile = new File(outputDir + '/page-' + (i + 1) + '.tif');
+        ImageIO.write(image, 'TIFF', outputFile);
+    }
+    document.close();
+}
+
+// Call the function with appropriate file paths
+var pdfPath = '/tmp/mac.pdf';
+var outputDir = '/tmp';
+convertPdfToTif(pdfPath, outputDir);
+````
+
 ## Connect to S3
 
 Initiated by _Gio_ using v1 of the AWS Java SDK
@@ -74,6 +217,108 @@ Happens on 3.6.1 and 4.2
 
 _Richard_
 The channel export was missing the "lastModified" element. Adding it and re-importing resolved. No one dug into how Mirth created an export with that field missing.
+
+## Secure a FHIR API using Keycloak
+
+_Genarro_
+To secure a FHIR API in Mirth via OAuth, has anyone used a combination of Keycloak and a Mirth HTTP listener channel with Authentication being set to OAuth 2.0 Token Verification?
+
+_joshm_
+I’ve not used the OAuth 2.0 Token Verification but I have used a custom JS script for Keycloak with an http listener
+
+_Genarro_
+Did you import the Keycloak JS library into a code template?
+
+_joshm_
+No I used a custom code template and a specific jar file.
+Here’s the function I ended up using. My `keycloakVerifyUrl` ends in `/protocol/openid-connect/userinfo`. For this part, I didn’t need any external libraries. In my source connector, I added a custom script that calls this function and returns either `AuthenticationResult.Success()` or `AuthenticationResult.Failure()` based on the return value of my validate function.
+
+````javascript
+function validateKeyCloakToken(token) {
+ var client = null;
+ var resp = null;
+ try {
+  var url = configurationMap.get("keycloakVerifyUrl");
+  
+  var sslContext = Packages.org.apache.http.conn.ssl.SSLContexts.custom()
+          .loadTrustMaterial(null, new Packages.org.apache.http.conn.ssl.TrustSelfSignedStrategy())
+          .build();
+  var supportedProtocalArray = ["TLSv1.3","TLSv1.2"]; 
+  var sslsf = new Packages.org.apache.http.conn.ssl.SSLConnectionSocketFactory(sslContext, supportedProtocalArray, null, new Packages.org.apache.http.conn.ssl.NoopHostnameVerifier());
+ 
+  //build client
+  var httpClient = Packages.org.apache.http.impl.client.HttpClients.custom()
+    .setSSLSocketFactory(sslsf)
+    .build();
+  
+  //create a request for of POST for the submission
+  var httpPost = new Packages.org.apache.http.client.methods.HttpPost(url);
+ 
+  httpPost.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  httpPost.addHeader("Authorization", "Bearer " + token);
+
+  //execute post and get response   
+  var resp = httpClient.execute(httpPost);
+ 
+  var respString = Packages.org.apache.commons.io.IOUtils.toString(resp.getEntity().getContent(), "UTF-8");
+  //logger.info("token userinfo:  " + respString);
+  // check response
+  var statusLine = resp.getStatusLine();
+  var statusCode = statusLine.getStatusCode();
+  var statusReason = statusLine.getReasonPhrase();
+  if(statusCode >= 300){
+   return false;
+  }
+ 
+  return true;
+ }
+ catch(exp){
+  logger.error(channelName + " - Failed keycloak token verification. Exception - " + exp);
+ }
+ finally{
+  if(resp != null){
+   resp.close();
+  }
+  if(client != null){
+   client.close();
+  }
+ }
+ return false;
+}
+````
+
+## Resolve phantom channel dependencies
+
+A JIRA ticket was created by _Judith Epstein_ 12 April 2023.
+
+_Richard_
+Using Mirth v3.12, is there a UI hack to remove phantom channel dependencies? When I export certain channels, they have an extra ID listed under `<dependencyIds>` which don't show in the "Set Dependencies" UI list. I can remove all the dependency channels in the UI, save the channel, re-add the deps, export the channel, and the phantom remains.
+
+_jonb_
+Probably yes - The channel deps are stored in an XML blob in the config table and not with the channel itself. Nuke that row from the XML blob, save the blob back, and it’ll probably be sorted.
+
+## Convert HL7 v2 messages to FHIR Resources
+
+_Arun Kumar P_ on 11 April 2023
+We are looking at converting HL7 v2 messages to FHIR Resources. We do not have the budget to buy the commercial add-on.
+Can you please guide me on
+
+* High level design
+* Sample Programs
+* Do’s and Dont’s
+
+_Richard_
+here's [a link](Mirth.md#sample-message-transformations) to sample message conversions that was recommended recently.
+
+_joshm_
+there’s no easy button either way. Commercial add-on or not. The simplest way is to break down what resources you need and look at example FHIR resources and manually build your JSON based on those examples
+I can tell you from first-hand experience, I spent a few hundred hours mapping a single transaction type into all of the appropriate FHIR Resources. Once you get some of the basics though, you do get some reuse if you build code templates and functions correctly. Build yourself some commonly reused functions to map common data types. Then go up from there to common segments like “PID”, “GT1", “PV1”, etc that you know you are likely to see in multiple message types.
+
+_Kirby Knight_
+Azure has a [conversion tool](https://learn.microsoft.com/en-us/azure/healthcare-apis/fhir/convert-data).  I have just done minimal testing with it and have not used it in production.
+
+_Mitch Trachtenberg_
+Although I haven't investigated [this](https://github.com/LinuxForHealth/hl7v2-fhir-converter), you might want to.
 
 ## Know which JS functions are available with my version of Mirth
 
@@ -450,22 +695,39 @@ Issue: user expressed using routeMessage() didn't send 'sourceChannelId(s)' and 
 * Solution #1: It's a [requested feature](https://github.com/nextgenhealthcare/connect/issues/5293)
 * Solution #2: create a new destination that filters on the existing logic you're using for routeMessage()
 * Solution #3: Link in Solution #1 also has a code solution, but it's a manual addition.
-* Solution #4: another manual addition
+* Solution #4: manual additions
+
+By _Andy Murray_:
+
+````javascript
+//jonb - Hot pro tip - use the channel name AND the originating message ID.
+//Soooo nice when you gotta track things across a few channels.
+router.routeMessageByChannelId(<sendToChannelId>,
+  new RawMessage(
+    SerializerFactory.getSerializer('HL7V2').fromXML(msg),
+    null,
+    {
+      "sendingChannelId":channelId,
+      "sendingMessageId":connectorMessage.getMessageId()}
+    )
+);
+````
+
+By others:
 
 ````javascript
 var attributes = new Packages.java.util.HashMap();
 var newSourceMap = connectorMap.entrySet().iterator();
 
 logger.info(newSourceMap + " :: has items :: " + newSourceMap.hasNext());
-        // Start the iteration and copy the Key and Value
-        // for each Map to the other Map.
-        while (newSourceMap.hasNext())
-        {
-     var mapItem = newSourceMap.next();
-            // using put method to copy one Map to Other
-            attributes.put(mapItem.getKey(),
-                           mapItem.getValue());
-        }
+// Start the iteration and copy the Key and Value
+// for each Map to the other Map.
+while (newSourceMap.hasNext())
+{
+  var mapItem = newSourceMap.next();
+  // using put method to copy one Map to Other
+  attributes.put(mapItem.getKey(), mapItem.getValue());
+}
 
 attributes.put("channelId", channelId);
 attributes.put("messageId", connectorMessage.getMessageId()); //TODO pass as Java Long to avoid floating point conversion
@@ -473,6 +735,9 @@ var message = new RawMessage(msg); //removed Packages.com.mirth.connect.server.u
 message.setSourceMap(attributes);
 router.routeMessage('Test1', message);
 ````
+
+Code template by _agermano_
+I had some code templates I was working on for this. Here's the [initial version](https://github.com/tonygermano/connect-examples/blob/router/Code%20Templates/Route%20with%20Sources/route.js). I still need to document it.
 
 ## Enable JS map lookups but hide the mapped values from the dashboard view
 
@@ -636,6 +901,29 @@ See _jonb_'s [SQL](https://gist.github.com/jonbartels/b961574b2043b628f1b0fd96f4
 ## Extract a zip fle
 
 See [forum post](https://forums.mirthproject.io/forum/mirth-connect/support/15433-unzipping-files-in-mirth).
+
+## Check if a segment exists
+
+_jonb_
+Also how do I quickly check if a segment exists in MC? if(msg['PV1']) ???
+
+_dforesman_
+`if (msg.elements(‘AIP’).length() > 0)`
+I found that on the forums once and saved it
+
+_tiskinty_
+personally I like the `msg..PV1.length` approach, but I think it's just semantics
+
+_agermano_
+I'd avoid the double dots
+`msg.PV1` is the same as `msg['PV1']`. `msg..PV1` is the same as `msg.descendants('PV1')`
+
+_jonb_
+So it has to be a length check and not truthy/falsy
+
+_agermano_
+but yeah, no matter which one you use, they all return an `XMLList` which might be empty. Since it's a non-null object it's always truthy. the length is how you tell if it's empty or not. `msg.PV1` is also the same as `msg.child('PV1')`. `msg.elements('PV1')` only gives you the children that are element types, so it would exclude `text` node children.
+but in mirth hl7, a node will never have mixed children types, they are either `elements` or `text`, not both.
 
 ## Format a String that may contain a decimal
 
