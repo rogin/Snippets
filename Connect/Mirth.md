@@ -20,7 +20,7 @@ _narupley_: new code signing cert that is baked into the launcher, that's it
 
 ## Other projects on github using Mirth?
 
-See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in [Mirth Slack](https://mirthconnect.slack.com) found useful.
+See [my github star list](https://github.com/stars/rogin/lists/mirth-related) that others in [Mirth Slack](https://mirthconnect.slack.com) found useful.
 
 ## Where to start learning
 
@@ -30,10 +30,84 @@ See [my list](https://github.com/stars/rogin/lists/mirth-related) that others in
 
 See our [new section](HowDoI.md).
 
+## Who is currently selling ANY Mirth extensions or paid extra software?
+
+23 Jan 2023
+
+* [Zen SSL](https://consultzen.com/zen-ssl-extension/)
+* [NextGen](https://www.nextgen.com/)
+* [InterfaceMonitor](https://www.interfacemonitor.com/) / [xc-monitor](https://mirth-support.com/xc-monitor)
+* [MirthSync](https://saga-it.com/tech-talk/2019/03/15/mirthsync+installation+and+basic+usage) is [on GitHub](https://github.com/SagaHealthcareIT/mirthsync), is it a freemium model?
+* Mirth Connect User Group maintains a [list](https://www.mcug.org/mirthvendors)
+
+## MC plugin ideas
+
+See [here](PluginIdeas.md).
+
+## Filer Reader not moving to ERROR folder on DB error
+
+If your file reader doesn't move to ERROR folder when a DB error occurs, try changing the `response` drop-down from none to the destination.
+
+## Issue with SFTP channel using a UNC path
+
+_AzDave_
+I have a super basic SFTP channel that picks up files from a source, then moves them to a destination. I had set it up, under the Sources tab, to move a copy of the original to a save directory so we could have an original copy. For some reason that move after processing action is not working. No errors, it just seems to not Move after Processing. I have done it on other channels successfully. Manual test worked with WinSCP.
+
+_pacmano_
+This is usually the “relative to” directory problem. your move to directory appears to be a UNC path. does the process running mirth have access to that network file share? you can however delete from SFTP and write the file locally, just not from that `after processing` spot in the interface
+
+_agermano_
+The source and destination dirs need to be on the same file system. you can't move from sftp to a UNC path. you can only move to another dir on the same sftp server. if it needs to go to a UNC path, then set up another file writer destination
+
+_Kirby Knight_
+When testing with a SFTP server, I use filezilla to test the flow manually.
+
+## CI/CD pipeline
+
+_itsjohn_
+Hello all, has anyone implemented a CI/CD pipeline with mirth connect?
+
+_pacmano_
+[Link to GH discussion](https://github.com/nextgenhealthcare/connect/discussions/4689)
+
+_RunnenLate_
+Within Azure we have repos for every channel and a pipeline that links for every repos, when we push to the repo it creates a new release and auto deploys to the next environments based on scripts I've hooked into the API. `dev--> test--> external test--> prod`. That's the best setup I've found with the tools and procedures we have
+
+_itsjohn_
+When you deploy changes, I’m assuming you’re undeploying existing and deploying a new version of the channel…are the message history preserved?
+
+_RunnenLate_
+messages are stored in the database based on an ID that gets created when you create a new channel, it also assigned a channelID  so if it's your first channel the you get a random string for channelID `234234ded-234sdas-4343354-dsdd34` something like that and the tables for the messages would be `MM_1`. if you upload new XML, it will look at that channelID and use that to overwrite the existing channel and preserve the messages. if it's a different channelID, then it will create a new channel and create `MM_2` in the database
+
+_itsjohn_
+But if I push changes for a channel on test to stage server, the channel IDs won’t be same. Even the first time, it’ll create a new ID, no?
+
+_RunnenLate_
+so that API uses the channelID to put the new XML so you need to know the channelID you are pushing to
+
+_itsjohn_
+Oh you’re using the mirth api. I was assuming that you’re using Mirth cli
+
+_RunnenLate_
+we use the cli in dev, export using the cli into a local repo then push from the local repo to an Azure repo, once a push occurs it triggers a new release for that pipeline and will push it to the testing enviornmnets via a python script I wrote that used the api to put the new xml for the channel. the channelIDs don't have to be the same between environments but it makes it much easier. if they are different, you have to store all that within azure for each environment and replace them each time.
+
+## Batch file size considerations
+
+_Kirby Knight_
+Has anyone run into a file size limit when using Mirth's batch processing for CSV files?
+
+_joshm_
+not specifically a CSV file, but have for sure run into file size limitations when trying to use batch processing on large files. I’ve had to write custom javascript batch scripts before to deal with huge EDI files. Maybe a couple dozen MB? Nick wrote [this](https://github.com/nextgenhealthcare/connect-examples/blob/master/Scripts/EDI%20X12%20Batch%20Script/EDI%20X12%20Batch%20Script.js) for me years ago to deal with that. maybe there’s something in there you can leverage for your CSV data. Probably that `consumeNewLine` function.
+
+_Kirby Knight_
+I'm actually looking at putting the limit on the CSV files that are created. Just wondering what that limit should be. Seems like south of a couple dozen MBs will be a good starting point.
+
+_joshm_
+10 is a nice round number. I say that because a number of the AWS services we work with have a 10 MB limit on message size.
+
 ## Where are those scripts by Alex Aitougan?
 
-[_jonb_](https://github.com/nextgenhealthcare/connect/discussions/4918#discussioncomment-1823705): Alex Aitougan shared some snippets at [#3819](https://github.com/nextgenhealthcare/connect/issues/3819#issuecomment-692894231) that may help you
-My team and I have used these in a limited capacity for lower-volume workloads. We did have to modify them but I don't recall exactly how. These are a good baseline.
+[_jonb_](https://github.com/nextgenhealthcare/connect/discussions/4918#discussioncomment-1823705): Alex Aitougan shared some snippets at [#3819](https://github.com/nextgenhealthcare/connect/issues/3819#issuecomment-692894231) that may help you. My team and I have used these in a limited capacity for lower-volume workloads. We did have to modify them, but I don't recall exactly how. These are a good baseline.
 
 ## What does the 'pause' button actually do?
 
@@ -47,11 +121,11 @@ _pacmano_ seeing a "Ã" being received in a raw HL7 coming into a HTTP Listener.
 
 _chris_
 Mirth doesn't let you sent the connector's charset for inbound.
-So it will follow HTTP spec which is that the default charset for text/* without a charset parameter is ISO-8859-1.
+So it will follow HTTP spec which is that the default charset for text/* without a charset parameter is `ISO-8859-1`.
 Try setting "binary mime types" to "anything".
 Then you'll just get bytes, and you can convert to string yourself and force UTF-8 encoding.
 But I think your config may be the problem, here.
-You could ask the sender to use text/plain; charset-UTF-8 and see if that improves things.
+You could ask the sender to use `text/plain; charset-UTF-8` and see if that improves things.
 
 _pacmano_
 That fixed it. No code changes on my side needed.
@@ -62,7 +136,6 @@ That you're using all of the Max Connections defined in your TCP Listener.
 
 ## Properly use destinationSet filtering
 
-Richard
 This design can handle being fed a junk input message so that the junk message doesn't get sent to all destinations. It also ERRORs properly so investigations can occur.
 
 ### Example 1
@@ -107,7 +180,7 @@ connectorMap.put('filterReason', filterReason);
 
 ### Example 2 using a contextPath
 
-You could also filter based on a contextPath as _germano_ wanted when using a HTTP Listener:
+You could also filter based on a contextPath as _agermano_ wanted when using a HTTP Listener:
 "My thought was to name the destinations after the context path, so that I could do a simple `destinationSet.removeAllExcept([contextPath])` (as the function accepts both destination names AND IDs) to have it route the message to the correct destination. If a destination doesn't exist for the context path, then it would remove all destinations leaving nothing to do, and it could return a default response.
 I'll just set the responseMap variable in the source transformer as if it failed, and it won't get overwritten by any of the destinations"
 
@@ -217,6 +290,166 @@ I'd have to do some digging on this. I think the calling channel directly dispat
 
 [Long-ass thread](https://mirthconnect.slack.com/archives/C02SW0K4D/p1681915318018659) on truthy-ness with JS primitives and Java objects.
 
+## Mark an ORU^R01 as entered in error
+
+_jonb_
+What message type or status would I send to mark an ORU^R01 as entered in error? [status W](https://hl7-definition.caristix.com/v2/HL7v2.5/Tables/0085) on each OBX seems appropriate
+
+_joshm_
+Could also use [ORC.1](https://hl7-definition.caristix.com/v2/HL7v2.5/Segments/ORC) = XX or DE
+
+## Differences between Mirth, Rhapsody & redox
+
+_UKMirth_
+Any striking difference between Mirth, Rhapsody & redox ? apart from being open source & paid tools ?
+
+_jonb_
+I can’t comment in detail on Rhapsody. I have not used it. (@joshm you had some experience, can you help the new person?) Both Mirth and Rhapsody are integration engines.
+My current employer uses both Mirth and Redox. My last employer, Zen, competed with Redox and did it better. Redox is a service. It has some functionality similar to an integration engine but it is different. The main advantage of Redox is that once any given hospital or company is connected to Redox, then connecting to other Redox customers is easy. Redox handles a lot of common message types automatically.  Connectivity is easy but the customization and adding logic to Redox is not as easy as doing it in Mirth or Rhapsody. Redox and Zen both offer services, if your primary business is not writing interfaces and interop those services might be more cost effective so you can focus on your core work.
+Mirth is VERY flexible. It handles the basics well but you can go really wild with customizations that you might need for specific use cases. Mirth is also fairly accessible, a lot of my non-engineering staff have access to Mirth to look at dashboard and see message counts and errors. It empowers them to fix problems or come to my engineers with more detailed issue reports so we can fix them faster.
+Mirth is free open-source software but NextGen also offers some paid extensions that are generally worth the price. There are also training sessions that can help get more out of the free tool (tagging @Mitch Trachtenberg, since he runs those trainings)
+It is hard to go wrong starting with Mirth. The tool started because Gary Teichrow and some of the other founders needed an integration engine and couldn’t get even a preview of Iguana. So they got irritated and wrote their own. That low-barrier to get started has stuck with Mirth.
+Hope that helps. What is your general use case or need?
+
+_joshm_
+I’ve got experience with both Mirth and Rhapsody. Rhapsody is an interesting tool and is very powerful, allowing you to do a lot of things without having to write any actual code. Mirth tends to be more flexible. Both run in java and are cross platform. I like that Mirth has a plug-in architecture where you can create your own extension to do whatever you need that it doesn’t already do for you. You can also add 3rd party jar files if you need to use some specific java package to accomplish something that isn’t available out of the box.
+
+_pacmano_
+Redox total cost as installations grow is a trade off. As is the fact aggregators like Zen and Redox don’t often handle specialized workflow without traditional costs for that custom dev work. I’d note that they have no “special” access to EHRs, they use the same integration capabilities that you can use. It’s perhaps a complexity and cost question as much as anything else when choosing to write your own integrations or use an aggregator. I sorta made the term “aggregator” up,  I am not sure if there is another term. None of what I said is meant as a criticism.
+
+_the_Ron_
+Zen is not an aggregator, we do not make common connections for our clients other than National Networks like eHEX and CQ and even those are distinct connections and instances of our product Stargate.
+Zen offers a managed Integration as a Service solution that empowers entities to either be hands on or hands off.  But integrations are specific that client. We do offer solutions like SAML Utils, SSL Extension, FHIR Libraries, and some internal libraries to simplify and support the industry needs.
+
+_pacmano_
+I was referring to your Ehex stuff but your company and your call how it is phrased.
+
+_the_Ron_
+It is all good, just wanted to set expectations,  There are a lot of “Magic Sauce” things bantered about in the marketplace and we have found most of those fall short when the rubber meets the road. I truly wished there was some magic sauce stuff to simplify things but even XCA and XDS have quirks that must be managed.
+
+_Mitch Trachtenberg_
+Thanks, Jonb. For the record, the manager in charge of NextGen's Mirth Connect Training is Eric Butterfield; I am one of two current instructors. I'm happy, of course, to answer basic Mirth questions here when I'm able. For information about the trainings: [link](https://www.nextgen.com/services/mirth-connect-training)
+
+_Anthony Master_
+We (at our hospital) use Mirth and I have seen Rhapsody in use and have researched it a little bit. Before me our hospital used to have Cloverleaf and before that Siemens (don't know the product's name)
+IMO, Rhapsody from what I have seen is more non-coder friendly with a better GUI. The other analyst here at the hospital (non coders) liked Cloverleaf and Siemens because based on their experience they were more GUI based as well.
+But Mirth is open source and you can use it without any licensing costs or paid support if you choose to do so as long as you don't need some of the paid plugin features (SSL, Channel History, and FHIR to name a few). Mirth has a fairly simple GUI and it can be picked up fairly easy for your other non-coders staff to be able to see stats and start and stop channels without having any interface or coding experience.
+While we are at it, and comparing different interface engines and services, let me throw in my :tophat: and recommend if you are looking at something less GUI based and more coder based, have a look at gofer engine which is Nodes.JS/Typescript based and not Java like most of these interface engines seem to be. There is no GUI yet, so the entry curve is steep if you are not already familiar with developing Node.JS applications.
+I have built [this interface engine](https://www.npmjs.com/package/gofer-engine) for a custom EHR downtime solution we are developing in house and needed a fast and light running interface engine I can run in docker.
+It comes down to what features you want, if you want lower coding level or higher GUI level, and how comfortable you are with the different tech stacks used with each if you deploy them on-premise. There are some great IaaS solutions that may fit your need if you have the :moneybag: and not the :clock1:
+
+## Mac-specific issues
+
+### Can't run MCAL on mac
+
+_mklemens_
+for those with a mac:
+`open -a Mirth\ Connect\ Administrator\ Launcher.app --args -k`
+but I do also believe that me not having `javafx` installed is the reason why I cant run the jar, but doing it with this other command I believe uses the built in runtime.
+
+### Running NG Dockerfile on MacOS with M1 hardware
+
+_joshm_
+anyone have any experience running the official NG Dockerfile on MacOS with M1 hardware? I noticed that if I try to build theirs directly, it creates an AMD64 version, but if I explicitly use an additional layer like `FROM eclipse-temurin:17-jre`, it will build a native ARM version. Is there some way I can just use their native Dockerfile and make it compile to ARM?
+
+_jonb_
+I use layers too. [This](https://github.com/nextgenhealthcare/connect-docker/issues/15) seems related and links to some multi-platform build doco. Not my area of expertise either.
+
+_joshm_
+it runs fine as long as the underlying image is ARM-compatible. something docker uses qemu under the covers to emulate x86/AMD64
+
+_Matt L._
+isn’t that the base image they are already using in their [Dockerfile](https://github.com/nextgenhealthcare/connect-docker/blob/master/Dockerfile)?
+
+_joshm_
+yep, it absolutely is. something about the layering though tricks it into building the native variant. I tried to build it from a Dockerfile locally. it runs fine when I can get it to build the arm variant and other arm images run equally well
+
+_agermano_
+I think it's more than qemu is emulating the CPU. Docker needs to run on a linux kernel. Except for the windows variant. But that linux kernel is going to need to be built for arm or x86. so, it's probably running arm linux in the VM
+
+## Mirth appliance upgrade advice
+
+_Walther_
+Could i ask someone about upgrading the mirth vm appliance (V1000). Currently running 3.8 but I'm not sure about upgrading mirth version or postgres. Are these dummy proof to upgrade? Are there any existing items that i need to be aware of to update all of the pieces of the mirth appliance? Any help or guidance is extremely appreciated! I've been holding off upgrading just for fear of the unknown so let me know what you all think.
+Thanks!
+
+_jonb_ (and some _joshm_)
+Former NG employee, former consultant who supported appliances here:
+
+1. Take a snapshot before you start anything to practice on if possible.
+1. You pay for the appliance and for support. Get access to the NG “Success Community” and engage the paid support team
+1. Generally, the appliance upgrades are smooth. Under the covers it just installs RPM packages.
+1. The main upgrade risks for MC are channel support, so read the [release notes](https://github.com/nextgenhealthcare/connect/release) on Github for each MC release you are updating. Have a test plan.
+1. The last time I touched appliances (about 8 months ago) they were running what are in my opinion dangerously old versions of Postgres. Particularly the PG 9.6 series.
+1. DB upgrades are generally as long as the DB is large. Consider backups, pruning, etc. then do your upgrade
+
+_Walther_
+Would some of the coding that exists today not work with an upgrade?
+
+_joshm_
+very unlikely to have any issues unless you’re relying on some specific versions of included jar files to do some custom scripting. but that’s where reading the release notes comes in
+
+_Jarrod_
+Also if you use the plugins all of those need to get updated for the appliance mirth connect. And 'mirth results' on the appliance was sunset as well as of December 2022. (Last date I heard from NexGen)
+
+_jonb_
+lots of changes since [3.8](https://github.com/nextgenhealthcare/connect/releases). One example is that release (3.10?) that changed how DB case was handled. Then 3.? updated Java libraries. If you’re not using those features, no worries. If you were, test your code.
+
+## Mirth upgrade advice
+
+_mklemens_
+I wonder if anyone can give me advice on upgrading mirth... is there a general rule of thumb about upgrades? In the past, I have upgraded mirth (in a linux environment) by NOT using the installer and downloading the tar, extracting it to a new folder, copying over config files and then starting the service - and that's it.  Is this BAD to do or is this totally acceptable?
+
+_jonb_
+tarball is better, installer does weird stuff like running as root
+
+_pacmano_
+I manually download any extra extensions. I do use the installer now. Caveats are
+
+1. don’t install the service
+1. fix the dir permissions after install suitable for the non-root user that should run mirth.
+
+_mklemens_
+I always worried that there were certain behind the scenes scripts and other hidden stuff that maybe I was missing out on by not running the installer
+
+_jonb_
+TL;DR read the release notes and understand what you might be exposed to
+
+_pacmano_
+and create your own systemd startup scripts.
+
+_jonb_
+_TODO: link to section above "Mirth appliance upgrade advice"_
+
+_mklemens_
+and if an upgrade goes bad - is there any way to downgrade (besides just taking a database backup and restoring that backup)?
+
+_pacmano_
+I don’t think so. but never had to do that since someone should be thoroughly testing that way before a production upgrade.
+
+_mklemens_
+so for those of you that go the tar route... just extracting the tar into a new folder and copying config over is all that you ever do? no other special "upgrade scripts" or anything extra like that?
+
+_pacmano_
+when I did the tar route I extracted to a new dir and migrated what was needed over. Then symlinked to keep outside scripts from referring to the wrong dir. obviously lots of ways to do that.
+
+_agermano_
+@pacmano what do you gain by using the installer that way over unpacking the tarball? does it update in place?
+
+_pacmano_
+it auto detects the last install. seems to remove parts and install.
+
+## Replicate Cloverleaf resending "outbound post tps"
+
+_Jeff Jensenius_
+Hello -- I have some RAW Javascript code on a filter of a TCP sender. I would like to take an encoded message (tweak it myself) and run it into this connection WITHOUT hitting the code on the filter.  Our old engine (cloverleaf) this would be called resending "outbound post tps". Does mirth have the ability to do this?
+
+_pacmano_
+You mean bypass the source entirely?  Or send a message to mirth and skip a destination filter when it hits that destination? the latter is just a matter of modifying your filter to check for some value that would never occur in real life but does occur in the test message you are sending. i.e. check for it and just “return true” rather than do the rest of the filter code.
+
+_Jeff Jensenius_
+Thanks --  I would be sending to mirth and skipping the filter. I'll add the value and return true in the code.
+
 ## How threads work with the channel writer/vmrouter calls
 
 _jonb_
@@ -225,56 +458,27 @@ Is there a good writeup of how threads work with the channel writer/vmrouter cal
 _agermano_
 both a channel writer and vmrouter end up calling `EngineController.dispatchRawMessage`. it gets interesting. Everything converges [here](https://github.com/nextgenhealthcare/connect/blob/development/donkey/src/main/java/com/mirth/connect/donkey/server/channel/Channel.java#L1249) whether you call `routeMessage` to dispatch or the http listener's handler tries to dispatch a message. there is a Set of dispatchThreads, but it adds the current thread to the Set.
 
-## Can't run MCAL on mac
+## Mirth quirks that can bite you
 
-_mklemens_
-for those with a mac:
-`open -a Mirth\ Connect\ Administrator\ Launcher.app --args -k`
-but I do also believe that me not having javafx installed is the reason why I cant run the jar, but doing it with this other command I believe uses the built in runtime.
+### Channel changes won't deploy
 
-## MC plugin ideas
+9 Dec 2022
+Issue: channel changes were not being deployed.
+Solution: Be sure to undeploy the channel first as it resolved his issue. Multiple users vouch for this as they've all seen it occur.
 
-### Image conversion
+### MCAL lock-up
 
-_RunnenLate_
-Does anyone use mirth for image conversion?
+Ensure you click the checkbox for 'close MCAL after launch' or else the UI may freeze while performing common tasks. [Existing ticket](https://github.com/nextgenhealthcare/connect/issues/5765). _jonb__ observed it more on Windows in AWS Workspaces but have seen it on MacOS too.
 
-_tiskinty_
-I've used it for image compression before.
+_dforesman_ IIRC with this bug, if the one locks up, it'll "lock" up the other instances as well.
 
-_dforesman_
-I have used it to call imagemagick to convert to PDF
+### `channelName` not populated in the global PostProcessor
 
-_RunnenLate_
-I'm using the imageio library to convert PDF to TIF and visa versa. I'm just wondering if it's something that should be integrated into Mirth... thinking about making a plugin maybe.
-
-### Mirth UIs from JSON config
-
-_jonb_
-I have another good idea that I’m probably never going to implement.
-Inspired by Josh's idea - <https://github.com/nextgenhealthcare/connect/issues/5749>
-I think the hard part of writing plugins is the UI. IIRC the current standard is still “use Netbeans for Swing”. What if there was a sample plugin where the UI was just “heres a big text area, enter a JSON blob in that for your config object” then the plugin is responsible for parsing the JSON and applying its properties. This would let the developer focus on making the libraries and connector operation work well separately from the quirky bits of the Swing UI.
-
-### Channel dependency graph
-
-_Richard_ developed a PowerShell script to export the channel dependencies to DOT language, then used graphviz to generate a SVG. This would be helpful directly in Mirth as a plugin.
-
-### What is my IP
-
-_jonb_
-MC plugin idea - “What is my IP?”
-Its trivial to do with a channel that calls ifconfig.me but a button would be handy.
+_joshm_
+is `channelName` not populated in the global PostProcessor script? I worked around this with `ChannelUtil.getChannelName(channelId);` but odd that it didn’t work in the postprocessor but did in preprocessor script. it is a valid variable in context, but it returns `null` on the postprocessor.
 
 _pacmano_
-what is my local IP, what is my public IP, what is my container host IP.
-
-_jonb_
-How is the container host IP discoverable from software?
-Local interfaces can be enumerated
-
-_Jarrod_ with [SO question](https://stackoverflow.com/questions/9481865/getting-the-ip-address-of-the-current-machine-using-java)
-
-## Mirth quirks that can bite you
+I know I had to use ChannelUtil like you did for an undeploy script.
 
 ### No-op transformers that are enabled
 
@@ -293,16 +497,6 @@ _jonb_
 Funny story on [related ticket](https://github.com/nextgenhealthcare/connect/issues/4084). This got Zen in some hot water. As I recall Josh or Ron were hacking in $LARGE_CUSTOMER and loaded the channel view. This customer was so large it took a while (over a minute) for the channel list to load. So the dev just started working. They added a new channel + group, then POOF something like 200+ channels were suddenly un-grouped.
 Under the covers the client sends the whole set of channels to MC and that set is saved somewhere in the config table. Its a list of groups with child channel IDs.
 To support the filtered view either the client has to … do magic.. IDK… or the server has to support discrete operations on single channels AND the client has to be poking those updates to the server.
-
-## Who is currently selling ANY Mirth extensions or paid extra software?
-
-23 Jan 2023
-
-* [Zen SSL](https://consultzen.com/zen-ssl-extension/)
-* [NextGen](https://www.nextgen.com/)
-* [InterfaceMonitor](https://www.interfacemonitor.com/) / [xc-monitor](https://mirth-support.com/xc-monitor)
-* [MirthSync](https://saga-it.com/tech-talk/2019/03/15/mirthsync+installation+and+basic+usage) is [on GitHub](https://github.com/SagaHealthcareIT/mirthsync), is it a freemium model?
-* Mirth Connect User Group maintains a [list](https://www.mcug.org/mirthvendors)
 
 ## Pruning logic clarification
 
@@ -350,7 +544,7 @@ Add `--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED` to the `.vmo
 NG needs to update the vmopts file.
 [Existing ticket?](https://github.com/nextgenhealthcare/connect-docker/issues/22)
 
-### '500 Server Error' on Dashboard for mac
+### '500 Server Error' on Dashboard
 
 After a fresh install of Mirth on a mac, Dashboard page continously logs:
 
@@ -368,10 +562,10 @@ Add the vmoptions as described [here](https://github.com/nextgenhealthcare/conne
 
 See [forum](https://forums.mirthproject.io/forum/mirth-connect/support/16781-): you’re trying to set a repeating segment to a non repeating segment
 
-### JS "Object.values()" throwing
+### JS `Object.values()` throwing
 
 _itsjohn_
-I’m using Object.values() but it throws an error `cannot find function values in object function Object ()`.
+I’m using `Object.values()` but it throws an error `cannot find function values in object function Object ()`.
 
 _Daniel Ruppert_
 The Rhino Engine [doesn't implement](https://forums.mirthproject.io/forum/mirth-connect/support/19120-using-javascript-object-values) that until [v1.7.14](https://github.com/mozilla/rhino/pull/902). A [feature request](https://github.com/nextgenhealthcare/connect/issues/5541) was opened.
@@ -381,7 +575,7 @@ The Rhino Engine [doesn't implement](https://forums.mirthproject.io/forum/mirth-
 Encountered error text:
 `The source map entry "VARNAME" was retrieved from the channel map. This method of retrieval has been deprecated and will soon be removed. Please use sourceMap.get('VARNAME') instead.`
 
-Solution: Change all $('VARNAME') to sourceMap.get('VARNAME').
+Solution: Change all `$('VARNAME')` to `sourceMap.get('VARNAME')`.
 
 This was encountered in v3.12.0, and the error message was seen in the [latest v4.2.0 code](https://github.com/nextgenhealthcare/connect/blob/development/server/src/com/mirth/connect/server/userutil/ChannelMap.java#L74), so MC upgrades and channel fixes can be independent.
 
@@ -394,8 +588,7 @@ org.eclipse.jetty.io.EofException: Early EOF`
 the client is trying to send just tons of concurrent connections and it's limited to 10 threads.
 
 _tiskinty_
-based on experience, that's usually a network error. I would guess it's a firewall issue based on the EOF, but that's not a sure thing by any means
-the thread/connection setup doesn't usually cause that from what I've seen before. 99% of the time when I've seen it, it was directly related to a firewall or VPN setup needing to be restarted. Otherwise, it might be enough (depending on the actual networking setup) to re-deploy the channel. I've seen that work occasionally in the past. I wouldn't bank on it, but it's typically low risk
+based on experience, that's usually a network error. I would guess it's a firewall issue based on the EOF, but that's not a sure thing by any means. the thread/connection setup doesn't usually cause that from what I've seen before. 99% of the time when I've seen it, it was directly related to a firewall or VPN setup needing to be restarted. Otherwise, it might be enough (depending on the actual networking setup) to re-deploy the channel. I've seen that work occasionally in the past. I wouldn't bank on it, but it's typically low risk
 
 _RunnenLate_
 no firewall in front of the server, just an F5 which there is no way I would restart. I told the client to reduce their queue for 9000 to 100 and retry.
@@ -517,14 +710,14 @@ _jonb_ recommends [these](https://confluence.hl7.org/display/OO/v2+Sample+Messag
 
 ## Can Mirth verify certificates of external parties?
 
-(Feb 2023) Nothing directly in Mirth.
+Nothing directly in Mirth (as of Feb 2023).
 
 _chris_: It's very easy to pull a remote cert. Just connect to the service via HTTP and the server will provide it. Then you check it for upcoming expiration. Something like [certcheck](https://github.com/ChristopherSchultz/certcheck) or [check_ssl_cert](https://exchange.nagios.org/directory/Plugins/Network-Protocols/HTTP/check_ssl_cert/details) or [check_ssl_certificate](https://exchange.nagios.org/directory/Plugins/Network-Protocols/HTTP/check_ssl_certificate/details) or [check_http](https://nagios-plugins.org/doc/man/check_http.html).
 
 ## Mirth licensing Q&A
 
 Q1. Is CURES available under existing licenses or separate from other plugins?
-A1. Mirth Rep _Travis West_: "It is separate and requires Gold or Platinum bundles." (Essentially an upcharge in addition to platinum.)
+A1. Mirth Rep _Travis West_: "It is separate and requires Gold or Platinum bundles." (Essentially an upcharge in addition to Platinum.)
 Q2. Wasn't the Advanced Clustering plugin provided at Gold level?
 A2. Users noticed it was bumped to Platinum in early 2023. _Richard_ was looking through notifications for any warnings / reasoning.
 
@@ -556,9 +749,10 @@ The block size matters for Postgres. Has to do with how PG handles an IN clause.
 ### AWS instance numbers
 
 Seen in 2022
+_SteveX_
 "Can anyone point me in the direction of documentation/tips around best practice data pruner configuration settings? We have a server with > 1000 channels and millions of messages processed each day. We only store 5 days worth of data on each channel and prune daily, but the data pruner is taking over 32 hours to run with some individual channels taking over 45 minutes to prune about 209k messages and 2million content rows.  Database is MySQL running on an AWS RDS instance.  Is that the best I can expect the pruner to perform?  Am I better off pruning less often even though it will need to churn through more messages per run? Should I be tweaking the block size (currently set at 1000)?  Thanks for any pointers!"
 
-same person:
+_SteveX_
 "this instance is running on an AWS c5.12xlarge EC2 instance running linux and pointing to an AWS RDS r5.4xlarge MySQL DB. 1174 deployed channels with varying degrees of volume on them.  The server is mainly receiving messages via TCP and then writing out to a MSSQL DB so not a ton of complicated processing happening within the channels themselves."
 
 ### Who's using Mirth at global scale?
@@ -589,12 +783,6 @@ Also `NativeJavaList`, which allows you to access a `java.util.List` by index li
 User: messages are sent to the Channel and the channel send the messages to the destination channel. But when i look at the dashboard the Messages and the mappings are blank.
 Solution: Review your 'message storage' and 'message pruning' configuration - perhaps it is set to remove content on completion.
 
-## Channel deployment tips
-
-9 Dec 2022
-Issue: channel changes were not being deployed.
-Solution: Be sure to undeploy the channel first as it resolved his issue.
-
 ## Channel development tips
 
 ### "Include Filter/Transformer"
@@ -603,14 +791,16 @@ If you are queuing on a destination and it makes sense for your workflow, select
 
 ### Destination Set Filtering
 
-Given many destinations where most of them get filtered: to improve performance, you can instead use "Destination Set Filtering" in your source transformer. You can decide which destinations to exclude, and then those will not be committed to the database in the first place. That can greatly reduce the database load for a channel. This is described in the "Best Practices" section of the User Guide. (_narupley_)
+_TODO: link to above where we have sample code_
+
+Given many destinations where most of them get filtered: to improve performance, you can instead use "Destination Set Filtering" in your source transformer. You can decide which destinations to exclude, and then those will not be committed to the database in the first place. That can greatly reduce the database load for a channel. This is [described](https://docs.nextgen.com/bundle/Mirth_User_Guide_42/page/connect/connect/topics/c_Use_Destination_Set_Filter_faq_mcug.html) in the [Best Practices](https://docs.nextgen.com/bundle/Mirth_User_Guide_42/page/connect/connect/topics/c_Channel_Development_Best_Practices_and_Tips_connect_ug.html) section of the User Guide. (_narupley_)
 
 Summary for using this is
 
 1. create an additional channel at the end that is set to throw so admins review
-1. Default your removeAllExcept to the above channel
+1. Default your `removeAllExcept` to the above channel
 1. Log a 'reason for filter' text
-1. be sure to
+1. be sure to check the boolean return value to the `remove*` functions
 
 ### Set your response data type to RAW
 

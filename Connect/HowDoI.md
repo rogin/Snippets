@@ -16,6 +16,10 @@ _jonb_: Postgres is what NextGen uses internally in their paid appliance offerin
 
 See [here](https://github.com/nextgenhealthcare/connect/discussions/5389#discussioncomment-3497635).
 
+## Generate a Mirth-compatible cron expression
+
+Create a Quartz expression [here](https://www.freeformatter.com/cron-expression-generator-quartz.html).
+
 ## Trigger channel alert that does NOT match a regex (using negative lookahead)
 
 _Shane Dewitt_
@@ -892,7 +896,7 @@ const messages = ChannelUtils.getMessageByIndexV2({
 
 ## Access Rhino shell used by Mirth Connect
 
-Outlined by [_jonb_](https://gist.github.com/jonbartels/d8a1b789dd251e30c4a74baac3a3957a).
+Outlined by [_jonb_](https://gist.github.com/jonbartels/d8a1b789dd251e30c4a74baac3a3957a). See [here](https://forums.mirthproject.io/forum/mirth-connect/support/18382-run-javascript-in-channel-context-outside-of-mirth#post101735) (and/or [here](https://github.com/tonygermano/connect-vscode)?) to integrate into VS Code.
 
 ## Create a daily volume report
 
