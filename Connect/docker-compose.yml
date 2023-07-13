@@ -1,0 +1,36 @@
+version: "3.1"
+services:
+  mc:
+    image: nextgenhealthcare/connect:4.1.0
+    platform: linux/amd64
+    environment:
+      - DATABASE=postgres
+      - DATABASE_URL=jdbc:postgresql://db:5432/mirthdb
+      - DATABASE_MAX_CONNECTIONS=20
+      - DATABASE_USERNAME=mirthdb
+      - DATABASE_PASSWORD=mirthdb
+      - DATABASE_MAX_RETRY=2
+      - DATABASE_RETRY_WAIT=10000
+      - KEYSTORE_STOREPASS=docker_storepass
+      - KEYSTORE_KEYPASS=docker_keypass
+      - VMOPTIONS=-Xmx512m
+      - _MP_HTTPS_PORT=8493
+    ports:
+      - 8090:8080/tcp
+      - 8493:8493/tcp
+    depends_on:
+      - db
+    volumes:
+    - ./data:/tmp/data  
+  db:
+    image: postgres:12
+    environment:
+    - POSTGRES_USER=mirthdb
+    - POSTGRES_PASSWORD=mirthdb
+    - POSTGRES_DB=mirthdb
+    ports:
+    - "5436:5432"
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata: {}

@@ -9,9 +9,15 @@ See [here](https://github.com/stars/rogin/lists/rust).
 Use [_trace-command_](https://learn.microsoft.com/en-us/powershell/module/Microsoft.PowerShell.Utility/Trace-Command?view=powershell-7.3)
 
 ````powershell
-trace-command -expression {"g*","s*" | Get-Alias } -name parameterbinding -pshost
+Trace-Command -expression {"g*","s*" | Get-Alias } -name parameterbinding -pshost
 #to see all options for -name above
 Get-TraceSource
+````
+
+AND IF YOU FORGOT to run that before starting, use ([H/T redog](https://old.reddit.com/r/PowerShell/comments/13bv0be/how_to_get_a_starttranscript_like_file_output/jjcqe2n/))
+
+````powershell
+Get-Content (Get-PSReadLineOption | select -ExpandProperty HistorySavePath) | out-gridview
 ````
 
 ## Updating `Microsoft Store` apps
@@ -197,6 +203,7 @@ Enter-PSSession -computername $env:COMPUTERNAME -Configuration PowerShell.7
 - Can I create a cycled iterator that repeats a list? there's no 'yield' equivalent. I want `('red','green','blue')` to cycle forever.
 - Can I iterate with an index like other languages -- `for (index, value) in list.something()`. There's a [language request ticket](https://github.com/PowerShell/PowerShell/issues/13772) for \$PSIndex that was closed.
 - I need a PS script to run as admin on a fresh Win10 box to keep the system updated. How to configure the script to allow user to click .ps1 file to run, and have it prompt for creds? Adding `#Requires -RunAsAdministrator` did not work, plus the default PS v5.1 running it failed to parse simple lines correctly, e.g. "& control update" to open the Windows update panel.
+- Running a scheduled PS script without a popup. There are [ways](https://superuser.com/questions/62525/run-a-batch-file-in-a-completely-hidden-way) to wrap with VBS.
 
 ## Review one liners
 

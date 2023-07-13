@@ -39,12 +39,366 @@ See our [new section](HowDoI.md).
 * [InterfaceMonitor](https://www.interfacemonitor.com/) / [xc-monitor](https://mirth-support.com/xc-monitor)
 * [MirthSync](https://saga-it.com/tech-talk/2019/03/15/mirthsync+installation+and+basic+usage) is [on GitHub](https://github.com/SagaHealthcareIT/mirthsync), is it a freemium model?
 * Mirth Connect User Group maintains a [list](https://www.mcug.org/mirthvendors)
+* _pacmano_ mentioned [Shasta Networks](https://shastanetworks.com/ascent-platform/base-camp/) having a cool documentation tool
 
 ## MC plugin ideas
 
 See [here](PluginIdeas.md).
 
-## Filer Reader not moving to ERROR folder on DB error
+## Service ideas
+
+[Various ideas](ServiceIdeas.md) as folks integrate using MC.
+
+## FHIR client using JS
+
+[This](https://medium.com/@fhirBender/creating-a-patient-resource-with-fhir-js-a-guide-for-the-rebellious-javascript-lover-8d7247ffb50a) was mentioned which links to the [offical FHIR Patient docs](http://hl7.org/fhir/patient.html).
+
+## Get a JSON property regardless its name
+
+_itsjohn_
+I have a json `{ “m1” : “one”, “m2” : { “m3” : [ “two”, “three”] } }`. I want to access `m3` but in my scenario the field `m3` can be named anything. Is there a way to access that field and the array events without referencing the field names? I used `msg.m2.*` but that gave me `undefined`.
+
+_agermano_
+  17 hours ago
+If `msg.m2` is always an object with a single property, and you want to get the value of that property regardless of its name, you can do something like:
+
+````javascript
+var prop = Object.getOwnPropertyNames[msg.m2](0)
+var value = msg.m2[prop]
+````
+
+## Parameter `reprocessMetaDataIds` quirk(?)
+
+_joshm_
+On the [messageController.reprocessMessages()](https://github.com/nextgenhealthcare/connect/blob/4.3.0/server/src/com/mirth/connect/server/controllers/MessageController.java), the `reprocessMetaDataIds` parameter is optional. If not specified, it will reprocess ALL connector messages.
+
+## Backporting `foreach` in Mirth v3.6.0
+
+If you backport a `foreach` to this Rhino version,  change the arrow function to a regular function. Or if you're using it to copy from map to map, use `putAll()`.
+
+````javascript
+//split_json is a JS object (map),
+//Rhino can translate that to a Java Map,
+//then putAll does the work
+channelMap.putAll(split_json);
+`````
+
+## Mirth's various meanings for _metadata_
+
+_agermano_:
+
+* At the channel level, metadata can mean custom database fields.
+* At the connector level, metadata identifies the source or a specific destination.
+* In a Channel Writer, metadata populates the downstream channel's `sourceMap`.
+
+## Use immutable dates to avoid bugs
+
+_mkopinsky_
+so we had a production incident where we were sending out some wrong data because of a minor bug in a Mirth channel:
+
+````javascript
+var prepTime = arrivalTime;
+prepTime.setHours(arrivalTime.getHours() - 6);
+should instead have been
+var prepTime = new Date(arrivalTime);
+prepTime.setHours(prepTime.getHours() - 6);
+````
+
+The old version of the code meant that `arrivalTime` also got modified in that second line, when the intent was only to modify `prepTime`.
+Other than "now we know to do `var foo = new Date(bar)` instead of `var foo = bar`", is there a better way to prevent this kind of bug?
+
+_agermano_
+Use [java.time](https://docs.oracle.com/javase/8/docs/api/java/time/LocalDateTime.html). Then you just need to do `var prepTime = arrivalTime.minusHours(6)`, and it will return a new `LocalDateTime`, because they are immutable.
+
+## MCAL needs Java 8 for FHIR plugin
+
+_James Oakes_
+Hi All, I'm currently experiencing a weird issue with the FHIR Plugin.
+When I go to code templates and look at a 'FHIR Resource Builder' template, there is an error in the drop down box saying `<no models found>`.
+I have tried creating new templates and this happens for all fhir versions.
+The other weird thing is that my existing code templates that are in use are still functioning fine.
+So i'm guessing the issue lies with the UI builder...
+When checking the extensions section, I can still see that the FHIR plugin is installed (Version 4.2.0 b1791)
+The only change I have made is updating the admin client launcher to version 1.4.
+There is also no errors in the launcher.log to indicate any issues
+
+_joshm_
+I’ve heard there is a known issue with certain versions of Java and the FHIR plugin. Tell the launcher to use Java 8 with that instance and see if your issue resolves.
+
+_James Oakes_
+That worked!
+
+## Generating HL7 and FHIR messages
+
+_Anderson Araujo_
+Is there a public server to generate HL7 and FHIR messages for development testing?
+
+_jonb_
+<https://hapi.fhir.org/> for FHIR
+
+_Qwelm_
+I've always had to create my own HL7v2 messages for testing. [FHIR-Converter](https://github.com/microsoft/FHIR-Converter) showed up in the #random channel for making it a FHIR message.
+
+## Running Mirth on AWS EC2 instances
+
+_Amy Workman_
+Looking for someone in the community that is running Mirth on AWS EC2 instances that is willing to speak about how they have architected the server/network/VPN architecture. Anyone willing to share?
+
+_pacmano_
+in general, use the AWS reference architecture for HIPAA workloads, e.g. public/private subnets in VPC(s). Mirth backend is RDS multiAZ Aurora Postgres or RDS Postgres. IPSec tunnels using third party firewall (not using AWS IPSec for few reasons). MFA VPN for remote access to VPC provisioned that way also. Any https or tcps inbound service to Mirth is via a proxy and that proxy choice varies by a few factors. Anything deeper than that, you need to pay me.
+All kidding aside, it is a complex topic and you should engage an expert if architecting healthcare workloads on AWS is new to your team.
+
+## _kpalang_'s repository jars for a given Mirth version
+
+_Mitch Trachtenberg_
+What jar files does kpalang's repository contain for a given Mirth version?
+
+_agermano_
+[artifactIndex.json](https://github.com/kpalang/mirth-releases-api/blob/master/util/artifactIndex.json)
+It's basically all of the libraries generated by the source code, plus everything included with the open source extensions. I'm assuming he did that because it was easier to point to the extensions folder than to list multiple libraries per extension. I would only use the mirth libraries from this repo, because the 3rd-party libraries probably won't have all of the dependencies defined in Kaur's repo.
+
+## Filtering various extensions
+
+_Qwelm_
+Does a file reader set to read delimited data also have access to the binary (I'm trying to write filtered messages to a separate folder in an existing channel doing delimited reads)?
+
+I got it working in a single channel by doing the following:
+
+* Changing the Source File Reader to 'Binary'
+* Converting the file to a string if it passes the flat-file check (determined from file extension)
+* Send the files that don't pass the check to a Destination File Writer that writes files to a holding directory and sends an SMTP alert
+
+I leave all the existing Destination stuff as-is (I'm getting this set up as a feature-add for existing channels) and use the following Source Filter:
+
+````javascript
+// Variables for determining filtering
+var validExtensions = ['dat','txt']
+var filename = sourceMap.get('originalFilename')
+var fileExtension = filename.substr(filename.lastIndexOf('.') + 1)
+
+if(validExtensions.includes(fileExtension)){
+ destinationSet.remove(["Invalid File Extension Destination"]);
+
+ // Convert the b64 file to a byte array
+ var byteArray = FileUtil.decode(msg);
+
+ // Convert the byte array to a string and make that msg
+ msg = new java.lang.String(byteArray)
+} else {
+ destinationSet.removeAllExcept(["Invalid File Extension Destination"]);
+ 
+ // Log values for use in notification body
+ channelMap.put('validExtensions',validExtensions)
+ channelMap.put('filename',filename)
+ channelMap.put('fileExtension',fileExtension)
+}
+
+return true
+````
+
+## Interesting services provided by NextGen
+
+_pacmano_: If you have a support account, you can post your channel and it prints out a not bad PDF. (_ed_: link to service was pending)
+
+## Issue with SumoLogic's URL parameter in log4j2.properties
+
+_Emily G_ In a twist no one saw coming, just using the `log4j2.properties` file would not work because my sumo url had an `=` sign it in. But I was able to get it to send logs with the `log4j2.xml` file essentially straight from the documentation.
+
+## Utilization Report: Code Template Library Functions to Channels
+
+_jonb_ recommended [this](https://mirthutils.outcomehealthcare.com) from [Outcome Healthcare](https://outcomehealthcare.com/).
+
+## So you want to send a fax
+
+_Stephen Lynch_
+We have a client who wants to use Fax to distribute documents. We're looking at one Fax vendor in particular who provide HTTPS APIs for sending faxes, which sounds like it will work. But in a wider sense, are there any 'gotchas' when dealing with Faxes from Mirth? I'm hoping it's as simple as it sounds, but just wondering if there are any pitfalls I should avoid? we're looking at [SRFAX](https://www.srfax.com/developers/internet-fax-api/)
+
+_jonb_
+__@CreepySheep__ is available for contract.
+You have to treat their delivery as asynchronous, and “trust but verify” that the fax was sent. My general workflow from Mirth is:
+
+1. Monitor Mirth, you want to know about errors fairly quickly
+1. Send your faxes to the API
+1. You want to track the faxes you send (MC metadata, separate DB, something)
+1. For any fax that the API says was “sent”, query back to the fax vendor's “Status” API and see if it was really sent
+1. Take action on things like “no answer”, “dead number”, “busy”, etc.
+1. Report back to support or clerical staff or something to deal with any undeliverable faxes
+
+Oh and to the best of your ability, try to decouple Mirth from a vendor. So like your central channel might push a generic message to an “interfax” sender or something. So you can change from __Interfax__ to __Ringcentral__ to whoever
+
+_Stephen Lynch_
+Your 5-step plan is pretty much something we have in place for a client in another country (not fax based - but the limitations are the similar - so we've implemented the auditing/alerting almost exactly as you described) Do you have a "least painful" fax vendor that you worked with?
+
+_CreepySheep_
+Every single one of them. Oh wait. None of them? I mean they're all bad and fax is bad
+
+_jonb_
+I have no strong preferences.
+
+* __Faxage__ let us down badly late 2022.
+* __Interfax__ is another one my current employer uses. No strong opinion from me.
+* __RingCentral__ had decent APIs. Used them because my employer at the time had other services from the same vendor.
+* __eFax__ used to be good, havent touched them in a loooong time though
+
+_Qwelm_
+We use a self-hosted Biscom Faxcom server. If you're planning on checking the status of the fax job I'd not recommend them. We tell staff that any automated faxing is "best effort" and not guaranteed to be received.
+DETAILS:
+The easiest 'API' they could offer us was to write a flat file to one folder and link it to an attachment by file name in another folder. The software just picks it up from there and attempts to send the attachments when a line frees up.
+The fax status is logged to a txt file that rotates throughout the day (catch your record before it clears!) and doesn't link back to the attachments.
+
+_chris_
+My problem with fax was always preparing the document to send, not in the actual connect, etc. Most services want PDF or some other "big fat document" that takes up a lot of memory. I think the one we use now accepts HTML and a decent subset of CSS which was great for us.
+
+## Regex to treat message as one long string when using PG
+
+_agermano_
+Finally... I've always had issues writing a regex search in the message browser against postgres when I needed to treat the message as one long string. `.*` doesn't match newlines, and usually I would use `[\s\S]*` as an alternative, but that throws an error for some reason. `[.\r\n]*` seems to work, and I was able to do `^[.\r\n]*(?!\rORC\|)$` to find messages that were missing an ORC segment.
+
+_siddharth_
+Impressive. This means we can toggle the ORC with any segment name?
+
+_agermano_
+sure... `(?!)` is negative lookahead, so it checks every character in the message from beginning to end and makes sure that none of them are followed by `\rORC|` in this case. you'll have to be careful if your messages don't use the proper segment delimiter to check for `(?:\r\n|\r|\n)` instead of just `\r` before the ORC. or leave that part off, but it could then match any field that ends in ORC
+
+## Parsing EDI X12 834/835 messages
+
+_akhsdev_
+I am looking for parser and viewer to handle EDI X12 835 transaction messages. Any help is appreciated.
+
+_kayyagari_
+<https://github.com/imsweb/x12-parser>
+
+_Sam Adarsh_
+I recently worked on parsing 834 files and extracting the data and convert the values to JSON objects. But this was based on the 834 files we are receiving, so you might have to make some code changes to meet your requirement. [x12_edi_834_reader.js](x12_edi_834_reader.js).
+
+## Stopping a queuing destination still allows queueing
+
+_Richard_
+sanity check please. given a channel with multiple destinations which are each set to queue, if i right-clicked and stopped a specific destination, will the stopped destination continue to queue, or will the dest be skipped over and/or error when a new message comes in? my understanding is the new message will queue in the stopped destination, just not get processed.
+
+_jonb_
+Just a moment I have a test channel I can verify the behavior with.
+IIRC the stopped destination will queue, others will run. confirmed.
+
+## Access tokens come in various forms
+
+* Where only one is valid at a time
+* Where you use one then the second is also valid during a shared timeframe
+
+_agermano_ If the token replacements are atomic, then you only run into an issue where renewing a token automatically expires the previous token at the same time. And then you only have a problem if Channel A gets the old token, then the token refreshes, and then Channel A tries to use the token it previously retrieved. You can't guarantee everyone has the newest token without locking the token from being updated between fetching and using it. But you might not need to if the API will accept the previous token as valid as long as it hasn't expired.
+
+Mostly agreed upon views
+
+* Avoid `$g` and `$gc`'s `lock/getSync/putSync` as they're deprecated and undocumented
+* _pacmano_ just a timed refresh. every x minutes. BUT, that same channels make a dummy call every y minutes and if that call fails it gets a fresh token.
+* _joshm_ I also usually just have a dummy channel that maintains the current $g value. like a watchdog that refreshes the token and actual API calls are expect to always have a good token. I call it my “Keep Alive” channel. _pacmano_ the keep alive and token getter are the same channel in my case
+* _RunnenLate_ I've run into issues setting a `globalMap` value from a polling server, which only sets it on that server, but it was needed on both servers. I had to route the call through an http channel and set it on both servers to ensure it existed on both.
+* Using guava with a time-based cache?
+
+## Threads and buffer conversation
+
+_Kirby Knight_
+gm, I have a channel where I am using multi-threading. On the source I am setting this variable 'tenantExtPatId' and the Max Processing Threads is set to 5. The destination is an HTTP Sender, with the queue threads set to 5 and the thread assignment variable configured to 'tenantExtPatId'.  When I came in this morning, a single message was blocking processing on the channel. With multi-threading enabled, my expectation is that only processing on that thread would be blocked.  Either my understanding is incorrect, or I have something misconfigured. the queue depth was 125,000+ and its normally 0 - 50. When I stopped and started the channel, a few messages would process, then it would stop
+
+(A single bad message hindered all his messages being processed. Screenshots showed 10 Queue Threads, a TAV set, and 1k Queue Buffer Size.)
+
+Average processing time (response date minus send date) for messages is about 1.5 seconds. 125K in the destination queue. the buffer size is set to 1000, but I had 125k in the queue. The buffer must be different from the queue.
+
+_agermano_
+So, when you stop and start the channel, I think it will fill up to that Queue Buffer Size of 1000 that you have set, which would get distributed across your 5 threads, hopefully fairly evenly. 1 thread would get stuck on your bad message. The other 4 would process everything assigned to them in that buffer of 1000 messages, and then the queue would get stuck on that one thread.
+
+_Kirby Knight_
+Why does it get stuck on the one thread?
+
+_agermano_
+Because the buffer doesn't refill until it's empty. And with a stuck thread, it won't empty. I didn't realize that was how it worked until I just dug into [the code](https://github.com/nextgenhealthcare/connect/blob/f1b87edb00a389453a833f0080fb60451b3bd7cb/donkey/src/main/java/com/mirth/connect/donkey/server/queue/DestinationQueue.java#L184-L188) - see its comment. I think the problem is that it can't assign a message to a thread bucket until after it has pulled it from the database. But it can only pull up to the number that you have defined into the buffer. So, even if it could detect that there was a stuck thread, it would only be able to pull a smaller number than the max buffer size the next time and some of those would get assigned to the stuck thread. eventually your entire buffer would be full of messages for the stuck thread and you'd be in the same boat. but it would be beating on the db harder as time went on as it was pulling fewer and fewer messages at a time. The TAV features does increase throughput by allowing for concurrency while maintaining message order, but apparently you're still limited by having all of your messages pass through a single destination queue when an issue arises. It's still better than using a single threaded destination. It's better than a single destination with a single thread. It's not as good as a separate channel when you want things completely separated. Or even one channel with multiple destinations. I think that's what happened when he bounced the channel because the bad message still caused one of the threads to get stuck, which eventually prevented the fetching of any more messages from the db (until another channel bounce when new threads would be created.) the queue is in the database and endless. The buffer is how many messages from the queue are currently being held in memory. when the buffer is drained, then it fetches more queued messages from the database. the worker threads can only work from the buffer. messages don't get assigned to a thread until they are in the buffer (because that code requires the messages to be in memory.) The database does not know to which thread a message will be assigned.
+
+_Kirby Knight_
+So what would the impact be if I changed the buffer to say '1'
+
+_agermano_
+it would serialize your channel again. well, maybe not quite. but mirth would only pull a single message from the database at a time. It would have to wait for its assigned thread to grab the message from the buffer, and then it could pull the next message from the database. 1 thread processing a bad message would still cause everything to get stuck. Usually it's only recommended to reduce the buffer size for very large messages due to memory consumption. A large buffer takes more mirth server memory, but fewer round trips to the DB. roughly how many tenants do you have? Would it be feasible to clone the destination for each tenant?
+
+_Kirby Knight_
+I don't really want to have multiple destinations
+
+_agermano_
+Understandable, but that would give each tenant a dedicated queue, so a bad message from one wouldn't stop traffic to others. I can't even think of how I would suggest a fix for this issue
+
+_jonb_
+The root cause is what is making the message hang in the first place
+
+_agermano_
+Absolutely, but you can't always predict when a bad message may hang a thread
+
+_Kirby Knight_
+error conditions will happen. Prior to this conversation, my understanding of the TAV feature was incorrect. Especially as it relates to error handling and TAV. Ideally, if there is a blocking error, it would be great if MC was able to process on the other threads and only assign messages with the same TAV as the one that error'd to the stuck thread.
+
+_agermano_
+yeah, it just can't without ignoring your max buffer size. Memory usage would balloon out of control. You couldn't really even replace the hung thread in the queue with a different one and skip the current message when you have your settings indicating that message order is important.
+
+_Kirby Knight_
+Thats why I'm saying put the messages with the same TAV as the error'd stuck message, in the stuck thread.
+
+_agermano_
+And if you did that too many time, then you'd have tons of hung threads hanging around in the system taking up resources. if you remove the stuck thread from the queue, then a new thread would take over the bucket that message was previously assigned to. you couldn't continue assigning messages to the thread that had been unassigned from the queue. Messages don't get directly assigned to threads. They get assigned to a bucket and the bucket maps to a thread. then the thread searches the buffer for messages that have been assigned to it, and when it finds one, then it removes that message from the buffer
+
+_Kirby Knight_
+What if I change my queue setting from queue messages 'Always' to 'On Failure'?
+
+_agermano_
+"on failure" wouldn't work either. When there are messages already in the queue, it needs to stick new messages in the back of the line to maintain order. what you described is when you turn the queue off completely. that would also break message order when the endpoint was down.
+
+## Query response message from specific channel
+
+_joshm_
+How would you go about querying the response message from a specific channel in the Mirth DB? I have narrowed down the channel internal ID to 103 and I know d_mm103 is my connector message table and I’m using the connector name of the destination. I specifically need the response connector message. I just need the response string so I can parse it and do something with it. Something like this is what I have now:
+
+````sql
+select mc.message_id, mc.content
+from  d_mm103 mm
+join d_mc103 mc on mm.message_id = mc.message_id
+WHERE mm.CONNECTOR_NAME = 'Destination 1'
+````
+
+but I need to figure out where to get the response message not the message going to the connector.
+
+_tiskinty_'s SQL
+
+````sql
+SELECT *
+from D_MC103
+where MESSAGE_ID = {message_id}
+and CONTENT_TYPE = 6
+and DATA_TYPE is not null
+````
+
+_pacmano_
+_@Michael Hobbs_ has some cool code to just go get it from the other channel (but not sure on your use case).
+
+_agermano_
+`content_type (int)` relates to the content type radio buttons in the message browser
+
+_jonb_'s Java
+
+````java
+public enum ContentType {
+  RAW(1), PROCESSED_RAW(2), TRANSFORMED(3), ENCODED(4),
+  SENT(5), RESPONSE(6), RESPONSE_TRANSFORMED(7),
+  PROCESSED_RESPONSE(8), CONNECTOR_MAP(9), CHANNEL_MAP(10),
+  RESPONSE_MAP(11), PROCESSING_ERROR(12), POSTPROCESSOR_ERROR(13),
+  RESPONSE_ERROR(14), SOURCE_MAP(15);
+````
+
+JOIN to `d_mc` and filter on message type. you need the join if you want to constrain by date or other info on the `mm` table. also remember indexes are limited on these tables, so watch your explain plans.
+
+_joshm_
+I need to constrain it to a specific connector.
+
+_agermano_
+that's what the `metadata_id` is for, the destination id. source is 0. your first destination might not necessarily be 1 if you've reordered or deleted destinations
+
+## File Reader not moving to ERROR folder on DB error
 
 If your file reader doesn't move to ERROR folder when a DB error occurs, try changing the `response` drop-down from none to the destination.
 
@@ -120,8 +474,8 @@ If I have a large queue and I pause the channel, does the queue continue to proc
 _pacmano_ seeing a "Ã" being received in a raw HL7 coming into a HTTP Listener.
 
 _chris_
-Mirth doesn't let you sent the connector's charset for inbound.
-So it will follow HTTP spec which is that the default charset for text/* without a charset parameter is `ISO-8859-1`.
+Mirth doesn't let you set the connector's charset for inbound.
+So it will follow HTTP spec which is that the default charset for `text/*` without a charset parameter is `ISO-8859-1`.
 Try setting "binary mime types" to "anything".
 Then you'll just get bytes, and you can convert to string yourself and force UTF-8 encoding.
 But I think your config may be the problem, here.
@@ -130,13 +484,27 @@ You could ask the sender to use `text/plain; charset-UTF-8` and see if that impr
 _pacmano_
 That fixed it. No code changes on my side needed.
 
+## Sending Mirth alerts to various apps
+
+_Mirth Dev_
+Hi All, just wanted to check did anyone try to integrate Mirth with MS team and send Mirth alerts to teams channel? Any reference link would be really useful.
+
+_joshm_
+Official [MS link](https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-incoming-webhook?tabs=dotnet) is probably a good place to start. just set your alerts to route to a channel instead of email. Then from your channel, do whatever you want. I have integration with slack today. you create an “app” in your slack web portal, then you can get webook URLs
+
+_pacmano_
+it’s a basic https post w/JSON after you create the endpoint. its a couple of minutes of work to do that post and create the endpoint. as for handling a reply, that’s different.
+
+_Mirth Dev_
+I found that MS Teams groups(channel) also provide email address. We can directly configure the Mirth alerts on this email, and it will be send out to that Channel.
+
 ## What is the indication when red numbers display in the Dashboard's Connection column?
 
 That you're using all of the Max Connections defined in your TCP Listener.
 
 ## Properly use destinationSet filtering
 
-This design can handle being fed a junk input message so that the junk message doesn't get sent to all destinations. It also ERRORs properly so investigations can occur.
+This design can handle being fed a junk input message so that the junk message isn't sent to all destinations. It also ERRORs properly so investigations can occur.
 
 ### Example 1
 
@@ -418,8 +786,7 @@ TL;DR read the release notes and understand what you might be exposed to
 _pacmano_
 and create your own systemd startup scripts.
 
-_jonb_
-_TODO: link to section above "Mirth appliance upgrade advice"_
+_jonb_ referenced the [above advice](#mirth-appliance-upgrade-advice)
 
 _mklemens_
 and if an upgrade goes bad - is there any way to downgrade (besides just taking a database backup and restoring that backup)?
@@ -460,6 +827,24 @@ both a channel writer and vmrouter end up calling `EngineController.dispatchRawM
 
 ## Mirth quirks that can bite you
 
+### Message Builder steps not wrapped in try/catch
+
+_agermano_
+interesting... mapper steps wrap in try/catch, but message builder steps don't. the current issue with the validate function is that the value is evaluated and throws the exception before being passed to the function. it just needs to be wrapped in a try/catch, so that if you are trying to access something at a long path that doesn't exist you can set a default value rather than throwing an exception. This is built in to mapper steps, but not message builder steps for some reason.
+
+You can create a simple function to do the try for you:
+
+````javascript
+function $try(f) {
+ try {
+  return f()
+ }
+ catch(e) {}
+}
+````
+
+Then in the message builder step, change the mapping to `$try(() => $['PractitionerObject']('name')[0]['suffix'][0])`. That will delay evaluation, and if the arrow function throws an exception, the `$try` function will return `undefined`, which will then let the mirth `validate` function use the default value specified in the message builder step.
+
 ### Channel changes won't deploy
 
 9 Dec 2022
@@ -482,7 +867,7 @@ I know I had to use ChannelUtil like you did for an undeploy script.
 
 ### No-op transformers that are enabled
 
-You'll see a recursive write error. Disable / delete the trans then redeploy. (TODO: VERIFY THIS ONE)
+You'll see a recursive write error. Disable / delete the transformer then redeploy. (TODO: VERIFY THIS ONE)
 
 ### ERROR status should be set but isn't
 
@@ -534,6 +919,19 @@ _Ryan Howk_
 I think we need message order preservation
 
 ## Error strings and their solutions
+
+### MCAL cert error after adding new cert from RapidSSL
+
+Error text: `javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target`
+
+You may have several JREs installed on the MCAL machine. Ensure the keystore (named `cacerts`) you updated to contain the new cert is for the JRE used to run MCAL. For pre-v1.4.0, the JRE path is set in `launch.vmoptions`.
+
+### MCAL cannot connect
+
+Error text: `Caused by: java.net.SocketException: Invalid argument: create`
+
+_Richard_
+You may encounter this error in a DOD environment within a VDI. Your MCAL is on a share and it lacks certain permission(s) -- see [details](https://bugs.openjdk.org/browse/JDK-8068568). One solution is to move the MCAL folder off the share -- try copy/pasting its folder directly onto the VDI's `C:`. The folder will be wiped when the VDI session ends, but the permission issue may be resolved in the next VDI session, or you can easily perform the same 'fix' again.
 
 ### Error when deploying channel
 
@@ -723,7 +1121,7 @@ A2. Users noticed it was bumped to Platinum in early 2023. _Richard_ was looking
 
 ## I encounter odd String and XML errors intermittently when sending between channels
 
-Ensure you do not have a [xalan](https://mvnrepository.com/artifact/xalan/xalan) jar in your custom library. (_rogin_ to fill in what problems were presenting)
+Ensure you do not have a [xalan](https://mvnrepository.com/artifact/xalan/xalan) jar in your custom library. [Here](https://github.com/nextgenhealthcare/connect/issues/4947#issuecomment-1120048480) is how _rogin_ replicated.
 
 ## Performance (and pricing?) metrics
 
@@ -767,6 +1165,8 @@ as I understand it, Ensemble and Corepoint and similar products are very “Ente
 _Anthony Leon_
  I'm former Mirth, Lyniate (sold Corepoint, Rhapsody, and the managed service after Datica/Sansoro acquisition) and did a quick stint at Health Gorilla. I worked in med device prior to joining Mirth as well. Happy to chat about different things with you. I of course cannot disclose specific clients (that aren't public) for any of the orgs due to certain agreements and what not but can help shed light onto your situation.
 
+_rbeckman-nextgen_ [said](https://github.com/nextgenhealthcare/connect/issues/3669#issuecomment-626961210) "a typical server can handle thousands of threads without issue."
+
 ## New functionality in Rhino v1.7.13
 
 The [How Do I](HowDoI.md) also has a section to determine which JS functions are available with each version of Mirth.
@@ -791,9 +1191,9 @@ If you are queuing on a destination and it makes sense for your workflow, select
 
 ### Destination Set Filtering
 
-_TODO: link to above where we have sample code_
-
 Given many destinations where most of them get filtered: to improve performance, you can instead use "Destination Set Filtering" in your source transformer. You can decide which destinations to exclude, and then those will not be committed to the database in the first place. That can greatly reduce the database load for a channel. This is [described](https://docs.nextgen.com/bundle/Mirth_User_Guide_42/page/connect/connect/topics/c_Use_Destination_Set_Filter_faq_mcug.html) in the [Best Practices](https://docs.nextgen.com/bundle/Mirth_User_Guide_42/page/connect/connect/topics/c_Channel_Development_Best_Practices_and_Tips_connect_ug.html) section of the User Guide. (_narupley_)
+
+See related [details and code sample](#properly-use-destinationset-filtering).
 
 Summary for using this is
 
@@ -820,7 +1220,7 @@ Another option to above by _jonb_ and _agermano_
 
 1. Source raw inbound; source hl7 outbound.
 1. In the source transformer - check message len, if its zero or not HL7 or whatever.
-1. If its blank - then call destinationSet.removeAll(). this is superior to a filter; build a response message with the HTTP error you want; do some logging.
+1. If it's blank - then call `destinationSet.removeAll()`. this is superior to a filter; build a response message with the HTTP error you want; do some logging.
 1. If its not blank call the HL7 serializer and parse the message. Send it out of the source transformer. wrap the serializer call in a try/catch to send back a meaningful error message when the message is not blank, but fails serialization
 1. Destination takes hl7 as input so when the destination does actual work its got HL7.
 
@@ -849,6 +1249,14 @@ SITECODE_function. If multitenant EHRBRAND_function. and USE TAGS FOR PORTS as c
 
 _Michael Hobbs_:
 I like to also start any channel that listens on a port with said port number. Then if I need I can click the channel view and sort by name.
+
+## Tool to monitor cpu/memory usage on a per channel basis
+
+_stormcel_
+do you guys know if there is a tool that can monitor cpu/memory usage on a per channel basis?
+As of 3.0 Mirth Connect no longer uses JMX bindings. In the past it was only done because Mule (the messaging engine we were using at the time) required it. However since we rewrote our own messaging engine from scratch, we no longer needed any RMI/JMX stuff.
+I did find [this](https://backstage.forgerock.com/knowledge/kb/article/a39551500)... imma gonna play.... they recommended jprofiler... which is expensive.
+I've been writing scripts that can analyze java threads. I was able to identify the exact channels causing problems in the cluster. The above article set me up for success.
 
 ## Message searching tips
 

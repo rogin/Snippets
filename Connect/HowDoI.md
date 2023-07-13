@@ -12,6 +12,159 @@ Don't, not even for development.
 
 _jonb_: Postgres is what NextGen uses internally in their paid appliance offerings
 
+## Email a CSV from filesystem
+
+_Zubcy_
+What's the best way for a channel to pick up a csv file from file location and send it to an email address, automatically.. or I would say, any piece of code which does the picking up part?
+
+_pacmano_
+Probably File Reader (raw), use attachment handler (entire message), email sender.
+
+_Anthony Master_
+This is for 3.8.0 from an old instance I use for some testing. But [here](SendFileToEmail.xml) is an example of how I have done this. @Zubcy you have the output file name variable where the content variable should be instead. And for MIME type, you probably want `text/csv`.
+
+## Access _kpalang_'s maven repo
+
+Legacy URL: <https://maven.kaurpalang.com/repository/maven-public/>
+Updated URL: <https://maven.pkg.github.com/kpalang/mirth-releases-api>
+
+Update your maven config with [this](mvn-kpalang.xml) to access the GitHub repo.
+
+## Resolve error with _kpalang_'s `mirth-plugin-maven-plugin`
+
+_Nathan Malinowski_
+`com.kaurpalang:mirth-plugin-maven-plugin:1.0.2-SNAPSHOT/maven-metadata.xml failed to transfer from <https://maven.pkg.github.com/kpalang/mirth-releases-api> during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of github has elapsed or updates are forced. Original error: Could not transfer metadata com.kaurpalang:mirth-plugin-maven-plugin:1.0.2-SNAPSHOT/maven-metadata.xml from/to github (<https://maven.pkg.github.com/kpalang/mirth-releases-api>): status code: 401, reason phrase: Unauthorized (401)`
+
+_agermano_
+That particular package it's complaining about isn't in that repo. I'm not sure if that `mirth-plugin-maven-plugin` is being hosted anywhere right now. You can build it yourself.
+
+_Nathan Malinowski_
+Yeah, building it worked.
+
+_agermano_
+[SO link](https://stackoverflow.com/questions/33548395/how-do-i-force-maven-to-use-my-local-repository-rather-than-going-out-to-remote)
+Maybe try building your project with the `-nsu` option so that it's not looking for a newer version of the plugin you built yourself?
+
+## Get received and sent message counts for all channels in timeframe
+
+_jonb_'s partial solution:
+
+````sql
+//TODO: exclude error_code rows where error_code != 0
+//as non-zero error code means it errored
+
+select count(received_date), connector_name
+from 'd_mm%'
+where received_date < '2023-06-12'
+group by connector_name
+order by connector_name asc;
+````
+
+## Export Mirth admin events for reporting purposes
+
+_stormcel_
+I made something similar for our HiTrust requirements. It's a daily report of administrative events within Mirth. Deploys, Logins, Logouts, ChannelUpdates, UserUpdates, etc. It all gets parsed into a pretty html email with tables, but it would be trivial to output to csv instead. I'm considering adding that part for future databasing.
+
+It's a [javascript channel](Report.js). The first destination hits the API for the user list so as to identify users by their ID, the second destination hits the events endpoint, and the third destination is an email sender with the transformer that builds the tables from those responses. It automatically runs each day for the previous day's events and takes about 36 seconds to run, but it is also capable of taking a message consisting of a start and end date and running a report for that stretch,  If you try to run an event report for more than a week, it can take more than an hour to run. so as _jonb_ said, slow. As I said, I capture the api returns from the first two destinations as usersList and responseList. The source transformer is so you can enter a manual date range the rest should be self-explanatory.
+
+## Select on the event table and return the Channel Name from the attributes column
+
+_jonb_ with the goods.
+
+"It should work for the XML based config table entries too".
+
+For sample dataset:
+
+````plain
+Deploy channels,2022-09-01 19:02:35.731000 +00:00,7eaf8f0e-9fb3-4afd-b60a-4e91679e2b34,Pruner Experiment
+Deploy channels,2022-09-01 18:44:31.543000 +00:00,7eaf8f0e-9fb3-4afd-b60a-4e91679e2b34,Pruner Experiment
+Deploy channels,2022-09-01 19:03:48.969000 +00:00,98c6447e-ab90-4784-9e76-c56a5e7ffe4a,Dummy HTTPS listener
+Deploy channels,2022-09-01 21:25:13.968000 +00:00,7eaf8f0e-9fb3-4afd-b60a-4e91679e2b34,Pruner Experiment
+Deploy channels,2022-09-02 20:39:27.373000 +00:00,2b2438bf-ff46-41ab-99dc-c955a53a4bfd,Remove Not Error and Not Source Content
+````
+
+For PG 9
+
+````sql
+SELECT name as event_name,
+       date_created,
+       unnest(REGEXP_MATCHES(e.attributes, 'Channel\[id=(.*),name.*' )) as channel_id,
+       unnest(REGEXP_MATCHES(e.attributes, 'Channel\[id=.*,name=(.*)\]' )) as channel_name
+FROM "event" e
+where e.name like '%Deploy%'
+   or e.name like '%Redeploy%';
+````
+
+For PG v10+
+
+````sql
+
+WITH attribute_rows AS (select e.name,
+                               e.date_created,
+                               xml_element.*
+                        from "event" e,
+                             xmltable('//linked-hash-map/entry'
+                                      passing (e."attributes"::xml)
+                                      columns "key" text PATH 'string[1]',
+                                          "value" text PATH 'string[2]'
+                                 ) as xml_element
+                        where e.name like '%Deploy%'
+                           or e.name like '%Redeploy%')
+SELECT name as event_name,
+       date_created,
+       unnest(REGEXP_MATCHES(value, 'Channel\[id=(.*),name.*' )) as channel_id,
+       unnest(REGEXP_MATCHES(value, 'Channel\[id=.*,name=(.*)\]' )) as channel_name
+FROM attribute_rows
+WHERE "key" = 'channel'
+````
+
+## Compile and run _connect_
+
+To build: `ant -buildfile .\server\mirth-build.xml`
+To run server: `cd .\server\setup && java -jar .\mirth-server-launcher.jar`
+To run client:
+
+* use MCAL with `-k` argument
+* OR the following script
+
+````powershell
+cd server/setup
+#generate classpath
+$cp = (Get-ChildItem './client-lib','./extensions' -Filter *.jar -Recurse -File | Resolve-Path -Relative) -join ";"
+#run the client
+java -cp $cp com.mirth.connect.client.ui.Mirth
+#alternatively
+java -cp $cp com.mirth.connect.client.ui.Mirth https://localhost:8443 0.0.0.0 admin admin
+````
+
+## Setup _connect_ in an IDE
+
+__Prerequisite__: Make sure your JRE contains `JavaFX`.
+
+### VS Code
+
+Open the project folder in VS Code. Run the `ant` build via the CLI. If it continues to list (1000+) build errors, restart the IDE to trigger a refresh.
+
+### Eclipse
+
+Follow [this guide](https://github.com/nextgenhealthcare/connect/wiki/Clone-Build-and-Run-from-Source) to import the projects, configure ant, and configure the launchers.
+
+__Note__: Eclipse currently requires JDK 11+ to run the `ant` script.
+
+### Netbeans
+
+Netbeans can load Eclipse project file(s), so first follow the guide above.
+
+## Configure docker port to match internal Mirth port
+
+_Arun Kumar_ ran various Mirth instances via docker containers. The MCAL Login page shows the internal port, but he wanted to see the docker port there. By configuring the same port for both, it will show as desired.
+
+See [docker file](docker-compose.yml) which has:
+
+* Postgres as the database
+* Volumes added so channels and other configuration remain even after restarting
+* Default application port changed from 8443 to 8493
+
 ## Determine the Message Pruning setting of each channel
 
 See [here](https://github.com/nextgenhealthcare/connect/discussions/5389#discussioncomment-3497635).
@@ -121,36 +274,26 @@ JSON.parse(responseMap.get('api/channels/statistics').getMessage()).list.channel
 
 i.e. get the response from the stats call and fix it up with the actual channel name. The above code is in the second destination's response transformer. In my prod code, I also sort that array by number of errors, build an html email, and send it with only the channels that meet the error threshold.
 
-## Convert PDF to TIF
+## Convert PDF to TIFF
 
 _pacmano_
 no extra libraries needed, mirth 4.0.1
 
+[Sample code](https://github.com/pacmano1/Mirth-Snippets/blob/main/PDFtoTIFF.js)
+
+## Convert TIFF to PDF
+
+_agermano_: This solution uses the super old version of `itext` that ships with mirth. I would try to use `pdfbox 2.x` in a new implementation as it ships with current versions of mirth.
+
+Pull [code](https://forums.mirthproject.io/forum/mirth-connect/support/17437-tiff-to-pdf-conversion). Replace file reading with _agermano_'s
+
 ````javascript
-var PDFRenderer = Packages.org.apache.pdfbox.rendering.PDFRenderer;
-var PDDocument = Packages.org.apache.pdfbox.pdmodel.PDDocument;
-var BufferedImage = Packages.java.awt.image.BufferedImage;
-var ImageIO = Packages.javax.imageio.ImageIO;
-var File = Packages.java.io.File;
-
-// Function to convert PDF to TIF
-function convertPdfToTif(pdfPath, outputDir) {
-    var document = PDDocument.load(new File(pdfPath));
-    var renderer = new PDFRenderer(document);
-    var pageCount = document.getNumberOfPages();
-
-    for (var i = 0; i < pageCount; i++) {
-        var image = renderer.renderImageWithDPI(i, 150); // Render the PDF page at 150 DPI
-        var outputFile = new File(outputDir + '/page-' + (i + 1) + '.tif');
-        ImageIO.write(image, 'TIFF', outputFile);
-    }
-    document.close();
-}
-
-// Call the function with appropriate file paths
-var pdfPath = '/tmp/mac.pdf';
-var outputDir = '/tmp';
-convertPdfToTif(pdfPath, outputDir);
+//option 1 (verified working for "Craig A")
+//https://javadoc.io/static/com.lowagie/itext/2.1.7/com/lowagie/text/pdf/RandomAccessFileOrArray.html#RandomAccessFileOrArray(java.lang.String)
+var ra = new RandomAccessFileOrArray(tiffFile)
+//option 2
+var tiffBytes = java.nio.file.Files.readAllbytes(java.nio.file.Paths.get(tiffFile))
+var ra = new RandomAccessFileOrArray(tiffBytes)
 ````
 
 ## Connect to S3
@@ -300,6 +443,8 @@ Using Mirth v3.12, is there a UI hack to remove phantom channel dependencies? Wh
 
 _jonb_
 Probably yes - The channel deps are stored in an XML blob in the config table and not with the channel itself. Nuke that row from the XML blob, save the blob back, and it’ll probably be sorted.
+
+_Richard_ stumbled across [this unrelated comment](https://github.com/nextgenhealthcare/connect/issues/4072#issuecomment-626972822) that may show how to replicate -- info sent to _Judith Epstein_.
 
 ## Convert HL7 v2 messages to FHIR Resources
 
@@ -536,29 +681,33 @@ _agermano_ You can run in batch mode as there is a "number of header records" pr
 
 In this case I'd probably put a javascript step before your iterator with delete msg.row[0]. That should remove the first row from msg, and since you are dealing with xml, it will shift the remaining rows and reindex them. A regular javascript array doesn't do that.
 
-## Embed Base64 image into PDF
+## Embed image into PDF
 
 Kicked off by _mkopinsky_ 16 Jan 2023
 
 _agermano_ with all the important bits.
 
-### Option 1
+### Option 1 - Document Writer
 
 He recommends Document Writer as "the document writer actually gives you the option of writing to a mirth attachment, which makes it really easy to embed in a second destination".
 
-### Option 2
+### Option 2 - inline image
+
+_pacmano_'s sample
+
+````html
+<html>
+<img src="file:///absolute/path/to/image.png"></img>
+</html>
+````
+
+### Option 3 - Base64 encoded image
 
 "You can use the legacy Flying Saucer and iText libs which are [still included](https://github.com/nextgenhealthcare/connect/tree/4.2.0/server/lib/extensions/doc)". "Data urls work as long as you've registered a url protocol handler for 'data' types".
 
 Echoing the [forum resolution](https://forums.mirthproject.io/forum/mirth-connect/support/16056-pdf-document-writer-and-base-64-encoded-images#post175260) below.
 
-User can embed
-
-````html
-<img src="data:image/jpg;base64,YOURDATAHERE" style="height: 153px; width: 118px;"/>
-````
-
-Then set
+First, set in your `.vmoptions` to support the data URLs
 
 ````text
 -Djava.protocol.handler.pkgs=org.xhtmlrenderer.protocols
@@ -568,10 +717,19 @@ Then set
 _The first line adds the "data" protocol handler to the search path used by the URL class.
 The second line appends the jar to the end of the classpath at startup. This is an option used by the install4j launcher and not directly passed to the jvm._
 
-### Option 3
+Second, create a source transformer (or perhaps in the deploy script?) to read the source image file as bytes, then encode the bytes to Base64 (ensure no CRLF). This example uses said data from var `pdf_img`:
 
-Use the newer libraries
-"The main libraries used now are openhtmltopdf running on top of PDFBox 2.x" and the "new lib also supports svg graphics".
+````html
+<img src="data:image/jpg;base64,${pdf_img}" style="height: 153px; width: 118px;"/>
+````
+
+__Note:__ _Craig A_ hit a limitation of itext --
+`java.io.IOException: Compression JPEG is only supported with a single strip. This image has 5 strips.`
+and "From what I am reading, no plans to support multistrips in itext".
+
+### Option 4 - newer libraries
+
+Use the newer libraries. "The main libraries used now are `openhtmltopdf` running on top of `PDFBox 2.x`" which "supports svg graphics".
 
 ## Access HTTP Listener request headers and metadata, setting custom response codes
 
@@ -581,7 +739,7 @@ See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/1
 
 ### Option 1 -- v4.2+
 
-(VERIFY) As of v4.2, Mirth will auto-generate a message hash value (which can be pulled from the right-side of the the UI as `Hash`), and users can access the Mirth hashing util class to perform on desired message segments.
+(VERIFY) As of v4.2, Mirth will auto-generate a message hash value (which can be pulled from the right-side of the the UI as `Hash`), and users can access [HashUtil](https://github.com/nextgenhealthcare/connect/blob/development/server/src/com/mirth/connect/server/userutil/HashUtil.java) to perform on desired message segments.
 
 ### Option 2 -- pre-v4.2
 
@@ -841,8 +999,8 @@ See [JS example](https://jsfiddle.net/pvj79z8s/) and [docs](https://developer.mo
 
 User's client wants to run the first X (of Y total) messages in a file during functional testing.
 
-* process as batch. check if var 'batchSequenceId' >= X, then do destinationSet.removeAll(). (_jonb_ and _pacmano_)
-* you can also manually split in a pre-processor for X loops, forward to a processing channel and then ditch the rest (_Jarrod_)
+* process as batch. check if var 'batchSequenceId' >= X, then `destinationSet.removeAll()`. (_jonb_ and _pacmano_)
+* you can also manually split in a pre-processor for X loops, forward to a processing channel, then ditch the rest (_Jarrod_)
 
 _jonb_'s other ideas
 
@@ -969,6 +1127,7 @@ JSON.stringify(msg);
 ## Migrate file-backed config map into Mirth DB
 
 See [_jonb_'s gist](<https://gist.github.com/jonbartels/4c4e0320f5596645b32bb1c38ac2d9c3>).
+_jonb_: That code goes in a channel. It syncs the file to the DB. Once it detects that it is using the configmap DB setting, it undeploys itself.
 
 ## Compare running channels against a master list
 

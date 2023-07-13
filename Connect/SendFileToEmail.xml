@@ -1,0 +1,381 @@
+<channel version="3.8.0">
+  <id>91bfcd1e-33bb-4a7f-894b-ccfa8689b9dd</id>
+  <nextMetaDataId>2</nextMetaDataId>
+  <name>SendFileToEmail</name>
+  <description></description>
+  <revision>1</revision>
+  <sourceConnector version="3.8.0">
+    <metaDataId>0</metaDataId>
+    <name>sourceConnector</name>
+    <properties class="com.mirth.connect.connectors.file.FileReceiverProperties" version="3.8.0">
+      <pluginProperties/>
+      <pollConnectorProperties version="3.8.0">
+        <pollingType>TIME</pollingType>
+        <pollOnStart>true</pollOnStart>
+        <pollingFrequency>5000</pollingFrequency>
+        <pollingHour>9</pollingHour>
+        <pollingMinute>0</pollingMinute>
+        <cronJobs/>
+        <pollConnectorPropertiesAdvanced>
+          <weekly>true</weekly>
+          <inactiveDays>
+            <boolean>false</boolean>
+            <boolean>true</boolean>
+            <boolean>false</boolean>
+            <boolean>true</boolean>
+            <boolean>true</boolean>
+            <boolean>true</boolean>
+            <boolean>true</boolean>
+            <boolean>true</boolean>
+          </inactiveDays>
+          <dayOfMonth>1</dayOfMonth>
+          <allDay>true</allDay>
+          <startingHour>8</startingHour>
+          <startingMinute>0</startingMinute>
+          <endingHour>17</endingHour>
+          <endingMinute>0</endingMinute>
+        </pollConnectorPropertiesAdvanced>
+      </pollConnectorProperties>
+      <sourceConnectorProperties version="3.8.0">
+        <responseVariable>None</responseVariable>
+        <respondAfterProcessing>true</respondAfterProcessing>
+        <processBatch>false</processBatch>
+        <firstResponse>false</firstResponse>
+        <processingThreads>1</processingThreads>
+        <resourceIds class="linked-hash-map">
+          <entry>
+            <string>Default Resource</string>
+            <string>[Default Resource]</string>
+          </entry>
+        </resourceIds>
+        <queueBufferSize>1000</queueBufferSize>
+      </sourceConnectorProperties>
+      <scheme>FILE</scheme>
+      <host>//path/to/files</host>
+      <fileFilter>*</fileFilter>
+      <regex>false</regex>
+      <directoryRecursion>false</directoryRecursion>
+      <ignoreDot>true</ignoreDot>
+      <anonymous>true</anonymous>
+      <username>anonymous</username>
+      <password>anonymous</password>
+      <timeout>10000</timeout>
+      <secure>true</secure>
+      <passive>true</passive>
+      <validateConnection>true</validateConnection>
+      <afterProcessingAction>MOVE</afterProcessingAction>
+      <moveToDirectory>//path/to/archives</moveToDirectory>
+      <moveToFileName>${DATE}_${originalFilename}</moveToFileName>
+      <errorReadingAction>MOVE</errorReadingAction>
+      <errorResponseAction>AFTER_PROCESSING</errorResponseAction>
+      <errorMoveToDirectory>//path/to/errors</errorMoveToDirectory>
+      <errorMoveToFileName>${DATE}_${originalFilename}</errorMoveToFileName>
+      <checkFileAge>false</checkFileAge>
+      <fileAge>1000</fileAge>
+      <fileSizeMinimum>0</fileSizeMinimum>
+      <fileSizeMaximum></fileSizeMaximum>
+      <ignoreFileSizeMaximum>true</ignoreFileSizeMaximum>
+      <sortBy>date</sortBy>
+      <binary>false</binary>
+      <charsetEncoding>DEFAULT_ENCODING</charsetEncoding>
+    </properties>
+    <transformer version="3.8.0">
+      <elements/>
+      <inboundDataType>DELIMITED</inboundDataType>
+      <outboundDataType>DELIMITED</outboundDataType>
+      <inboundProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDataTypeProperties" version="3.8.0">
+        <serializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedSerializationProperties" version="3.8.0">
+          <columnDelimiter>,</columnDelimiter>
+          <recordDelimiter>\n</recordDelimiter>
+          <quoteToken>&quot;</quoteToken>
+          <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+          <quoteEscapeToken>\</quoteEscapeToken>
+          <numberedRows>false</numberedRows>
+          <ignoreCR>true</ignoreCR>
+        </serializationProperties>
+        <deserializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDeserializationProperties" version="3.8.0">
+          <columnDelimiter>,</columnDelimiter>
+          <recordDelimiter>\n</recordDelimiter>
+          <quoteToken>&quot;</quoteToken>
+          <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+          <quoteEscapeToken>\</quoteEscapeToken>
+        </deserializationProperties>
+        <batchProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedBatchProperties" version="3.8.0">
+          <splitType>Record</splitType>
+          <batchSkipRecords>0</batchSkipRecords>
+          <batchMessageDelimiter></batchMessageDelimiter>
+          <batchMessageDelimiterIncluded>false</batchMessageDelimiterIncluded>
+          <batchGroupingColumn></batchGroupingColumn>
+          <batchScript></batchScript>
+        </batchProperties>
+      </inboundProperties>
+      <outboundProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDataTypeProperties" version="3.8.0">
+        <serializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedSerializationProperties" version="3.8.0">
+          <columnDelimiter>,</columnDelimiter>
+          <recordDelimiter>\n</recordDelimiter>
+          <quoteToken>&quot;</quoteToken>
+          <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+          <quoteEscapeToken>\</quoteEscapeToken>
+          <numberedRows>false</numberedRows>
+          <ignoreCR>true</ignoreCR>
+        </serializationProperties>
+        <deserializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDeserializationProperties" version="3.8.0">
+          <columnDelimiter>,</columnDelimiter>
+          <recordDelimiter>\n</recordDelimiter>
+          <quoteToken>&quot;</quoteToken>
+          <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+          <quoteEscapeToken>\</quoteEscapeToken>
+        </deserializationProperties>
+        <batchProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedBatchProperties" version="3.8.0">
+          <splitType>Record</splitType>
+          <batchSkipRecords>0</batchSkipRecords>
+          <batchMessageDelimiter></batchMessageDelimiter>
+          <batchMessageDelimiterIncluded>false</batchMessageDelimiterIncluded>
+          <batchGroupingColumn></batchGroupingColumn>
+          <batchScript></batchScript>
+        </batchProperties>
+      </outboundProperties>
+    </transformer>
+    <filter version="3.8.0">
+      <elements/>
+    </filter>
+    <transportName>File Reader</transportName>
+    <mode>SOURCE</mode>
+    <enabled>true</enabled>
+    <waitForPrevious>true</waitForPrevious>
+  </sourceConnector>
+  <destinationConnectors>
+    <connector version="3.8.0">
+      <metaDataId>1</metaDataId>
+      <name>Send Email</name>
+      <properties class="com.mirth.connect.connectors.smtp.SmtpDispatcherProperties" version="3.8.0">
+        <pluginProperties/>
+        <destinationConnectorProperties version="3.8.0">
+          <queueEnabled>false</queueEnabled>
+          <sendFirst>false</sendFirst>
+          <retryIntervalMillis>10000</retryIntervalMillis>
+          <regenerateTemplate>false</regenerateTemplate>
+          <retryCount>0</retryCount>
+          <rotate>false</rotate>
+          <includeFilterTransformer>false</includeFilterTransformer>
+          <threadCount>1</threadCount>
+          <threadAssignmentVariable></threadAssignmentVariable>
+          <validateResponse>false</validateResponse>
+          <resourceIds class="linked-hash-map">
+            <entry>
+              <string>Default Resource</string>
+              <string>[Default Resource]</string>
+            </entry>
+          </resourceIds>
+          <queueBufferSize>1000</queueBufferSize>
+          <reattachAttachments>true</reattachAttachments>
+        </destinationConnectorProperties>
+        <smtpHost>smtp.example.com</smtpHost>
+        <smtpPort>25</smtpPort>
+        <overrideLocalBinding>false</overrideLocalBinding>
+        <localAddress>0.0.0.0</localAddress>
+        <localPort>0</localPort>
+        <timeout>5000</timeout>
+        <encryption>none</encryption>
+        <authentication>false</authentication>
+        <username></username>
+        <password></password>
+        <to>your_email@example.com</to>
+        <from>your_sender_email@example.com</from>
+        <cc></cc>
+        <bcc></bcc>
+        <replyTo></replyTo>
+        <headers class="linked-hash-map"/>
+        <subject>Your Subject Here</subject>
+        <charsetEncoding>DEFAULT_ENCODING</charsetEncoding>
+        <html>false</html>
+        <body>Your Body Here</body>
+        <attachments>
+          <com.mirth.connect.connectors.smtp.Attachment>
+            <name>${DATE}_${originalFilename}</name>
+            <content>${message.rawData}</content>
+            <mimeType>text/csv</mimeType>
+          </com.mirth.connect.connectors.smtp.Attachment>
+        </attachments>
+      </properties>
+      <transformer version="3.8.0">
+        <elements/>
+        <inboundDataType>DELIMITED</inboundDataType>
+        <outboundDataType>DELIMITED</outboundDataType>
+        <inboundProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDataTypeProperties" version="3.8.0">
+          <serializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedSerializationProperties" version="3.8.0">
+            <columnDelimiter>,</columnDelimiter>
+            <recordDelimiter>\n</recordDelimiter>
+            <quoteToken>&quot;</quoteToken>
+            <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+            <quoteEscapeToken>\</quoteEscapeToken>
+            <numberedRows>false</numberedRows>
+            <ignoreCR>true</ignoreCR>
+          </serializationProperties>
+          <deserializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDeserializationProperties" version="3.8.0">
+            <columnDelimiter>,</columnDelimiter>
+            <recordDelimiter>\n</recordDelimiter>
+            <quoteToken>&quot;</quoteToken>
+            <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+            <quoteEscapeToken>\</quoteEscapeToken>
+          </deserializationProperties>
+          <batchProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedBatchProperties" version="3.8.0">
+            <splitType>Record</splitType>
+            <batchSkipRecords>0</batchSkipRecords>
+            <batchMessageDelimiter></batchMessageDelimiter>
+            <batchMessageDelimiterIncluded>false</batchMessageDelimiterIncluded>
+            <batchGroupingColumn></batchGroupingColumn>
+            <batchScript></batchScript>
+          </batchProperties>
+        </inboundProperties>
+        <outboundProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDataTypeProperties" version="3.8.0">
+          <serializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedSerializationProperties" version="3.8.0">
+            <columnDelimiter>,</columnDelimiter>
+            <recordDelimiter>\n</recordDelimiter>
+            <quoteToken>&quot;</quoteToken>
+            <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+            <quoteEscapeToken>\</quoteEscapeToken>
+            <numberedRows>false</numberedRows>
+            <ignoreCR>true</ignoreCR>
+          </serializationProperties>
+          <deserializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDeserializationProperties" version="3.8.0">
+            <columnDelimiter>,</columnDelimiter>
+            <recordDelimiter>\n</recordDelimiter>
+            <quoteToken>&quot;</quoteToken>
+            <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+            <quoteEscapeToken>\</quoteEscapeToken>
+          </deserializationProperties>
+          <batchProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedBatchProperties" version="3.8.0">
+            <splitType>Record</splitType>
+            <batchSkipRecords>0</batchSkipRecords>
+            <batchMessageDelimiter></batchMessageDelimiter>
+            <batchMessageDelimiterIncluded>false</batchMessageDelimiterIncluded>
+            <batchGroupingColumn></batchGroupingColumn>
+            <batchScript></batchScript>
+          </batchProperties>
+        </outboundProperties>
+      </transformer>
+      <responseTransformer version="3.8.0">
+        <elements/>
+        <inboundDataType>DELIMITED</inboundDataType>
+        <outboundDataType>DELIMITED</outboundDataType>
+        <inboundProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDataTypeProperties" version="3.8.0">
+          <serializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedSerializationProperties" version="3.8.0">
+            <columnDelimiter>,</columnDelimiter>
+            <recordDelimiter>\n</recordDelimiter>
+            <quoteToken>&quot;</quoteToken>
+            <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+            <quoteEscapeToken>\</quoteEscapeToken>
+            <numberedRows>false</numberedRows>
+            <ignoreCR>true</ignoreCR>
+          </serializationProperties>
+          <deserializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDeserializationProperties" version="3.8.0">
+            <columnDelimiter>,</columnDelimiter>
+            <recordDelimiter>\n</recordDelimiter>
+            <quoteToken>&quot;</quoteToken>
+            <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+            <quoteEscapeToken>\</quoteEscapeToken>
+          </deserializationProperties>
+          <batchProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedBatchProperties" version="3.8.0">
+            <splitType>Record</splitType>
+            <batchSkipRecords>0</batchSkipRecords>
+            <batchMessageDelimiter></batchMessageDelimiter>
+            <batchMessageDelimiterIncluded>false</batchMessageDelimiterIncluded>
+            <batchGroupingColumn></batchGroupingColumn>
+            <batchScript></batchScript>
+          </batchProperties>
+        </inboundProperties>
+        <outboundProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDataTypeProperties" version="3.8.0">
+          <serializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedSerializationProperties" version="3.8.0">
+            <columnDelimiter>,</columnDelimiter>
+            <recordDelimiter>\n</recordDelimiter>
+            <quoteToken>&quot;</quoteToken>
+            <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+            <quoteEscapeToken>\</quoteEscapeToken>
+            <numberedRows>false</numberedRows>
+            <ignoreCR>true</ignoreCR>
+          </serializationProperties>
+          <deserializationProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedDeserializationProperties" version="3.8.0">
+            <columnDelimiter>,</columnDelimiter>
+            <recordDelimiter>\n</recordDelimiter>
+            <quoteToken>&quot;</quoteToken>
+            <escapeWithDoubleQuote>true</escapeWithDoubleQuote>
+            <quoteEscapeToken>\</quoteEscapeToken>
+          </deserializationProperties>
+          <batchProperties class="com.mirth.connect.plugins.datatypes.delimited.DelimitedBatchProperties" version="3.8.0">
+            <splitType>Record</splitType>
+            <batchSkipRecords>0</batchSkipRecords>
+            <batchMessageDelimiter></batchMessageDelimiter>
+            <batchMessageDelimiterIncluded>false</batchMessageDelimiterIncluded>
+            <batchGroupingColumn></batchGroupingColumn>
+            <batchScript></batchScript>
+          </batchProperties>
+        </outboundProperties>
+      </responseTransformer>
+      <filter version="3.8.0">
+        <elements/>
+      </filter>
+      <transportName>SMTP Sender</transportName>
+      <mode>DESTINATION</mode>
+      <enabled>true</enabled>
+      <waitForPrevious>true</waitForPrevious>
+    </connector>
+  </destinationConnectors>
+  <preprocessingScript>// Modify the message variable below to pre process data
+return message;</preprocessingScript>
+  <postprocessingScript>// This script executes once after a message has been processed
+// Responses returned from here will be stored as &quot;Postprocessor&quot; in the response map
+return;</postprocessingScript>
+  <deployScript>// This script executes once when the channel is deployed
+// You only have access to the globalMap and globalChannelMap here to persist data
+return;</deployScript>
+  <undeployScript>// This script executes once when the channel is undeployed
+// You only have access to the globalMap and globalChannelMap here to persist data
+return;</undeployScript>
+  <properties version="3.8.0">
+    <clearGlobalChannelMap>true</clearGlobalChannelMap>
+    <messageStorageMode>DISABLED</messageStorageMode>
+    <encryptData>false</encryptData>
+    <removeContentOnCompletion>false</removeContentOnCompletion>
+    <removeOnlyFilteredOnCompletion>false</removeOnlyFilteredOnCompletion>
+    <removeAttachmentsOnCompletion>false</removeAttachmentsOnCompletion>
+    <initialState>STARTED</initialState>
+    <storeAttachments>false</storeAttachments>
+    <metaDataColumns>
+      <metaDataColumn>
+        <name>SOURCE</name>
+        <type>STRING</type>
+        <mappingName>mirth_source</mappingName>
+      </metaDataColumn>
+      <metaDataColumn>
+        <name>TYPE</name>
+        <type>STRING</type>
+        <mappingName>mirth_type</mappingName>
+      </metaDataColumn>
+    </metaDataColumns>
+    <attachmentProperties version="3.8.0">
+      <type>None</type>
+      <properties/>
+    </attachmentProperties>
+    <resourceIds class="linked-hash-map">
+      <entry>
+        <string>Default Resource</string>
+        <string>[Default Resource]</string>
+      </entry>
+    </resourceIds>
+  </properties>
+  <exportData>
+    <metadata>
+      <enabled>true</enabled>
+      <lastModified>
+        <time>1686661599311</time>
+        <timezone>America/Chicago</timezone>
+      </lastModified>
+      <pruningSettings>
+        <pruneMetaDataDays>1</pruneMetaDataDays>
+        <pruneContentDays>1</pruneContentDays>
+        <archiveEnabled>false</archiveEnabled>
+      </pruningSettings>
+    </metadata>
+  </exportData>
+</channel>
