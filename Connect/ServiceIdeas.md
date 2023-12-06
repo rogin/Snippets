@@ -75,3 +75,15 @@ _In years past the pharmacist would call the other pharmacies in town to locate 
 
 _jonb_
 The time cost to the pharmacies might be a good proposition, I sat on hold for three pharmacies, 10 minutes each. 30 minutes of time for a pharmacist or tech gets costly.
+
+_Anthony Master_
+The Pharmacy Interoperability and Emerging Therapeutics Task Force 2023 Roster: <https://mirthconnect.slack.com/files/U02CS0FQ9HU/F05HDSLAUGY/image.png>
+
+chat so far. This is already on the radar of discussion in some manner. Anyone heard of RxChange before? or NCPDP Pharmacy Product Locator Task Group?
+<https://mirthconnect.slack.com/files/U02CS0FQ9HU/F05GQ63R9H8/image.png>
+<https://mirthconnect.slack.com/files/U02CS0FQ9HU/F05GQ2NSJJF/image.png>
+<https://mirthconnect.slack.com/files/U02CS0FQ9HU/F05GQ2S8B6F/image.png>
+
+<https://standards.ncpdp.org/Standards/media/pdf/EmailToExistingTaskGroups.pdf>
+
+_Editor_: there's more discussed in the thread, but the fancy Task Force is stalled by red tape and canceled their future meetings.

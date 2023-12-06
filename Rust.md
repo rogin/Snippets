@@ -117,7 +117,25 @@ fn main() {
 
 and _Defaults can be added by implementing `Default` on the `Args` struct and using `..Default::default()` at the callsite._
 
+## foo
+
+From and Into round-up
+
+TODO: pull the important bits from the following
+
+<https://old.reddit.com/r/rust/comments/14uxt10/from_vs_into_which_should_generic_free_functions/>
+
+<https://www.reddit.com/r/rust/comments/anezli/when_to_use_from_vs_into/?utm_source=reddit&utm_medium=usertext&utm_name=rust&utm_content=t1_jr9rr8b>
+
+<https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=7b0c0bc8e0fc65d30b313899a0d7480c>
+
+<https://ricardomartins.cc/2016/08/03/convenient_and_idiomatic_conversions_in_rust>
+
 ## Unsorted
+
+[The Little Book of Rust Books](https://lborb.github.io/book/)
+
+<https://github.com/sger/RustBooks>
 
 You can [implement a trait](https://old.reddit.com/r/rust/comments/14wsv8b/ampersand_in_impl_statement/) for `Reference` which they say can also be done for `Mutable Reference`.
 

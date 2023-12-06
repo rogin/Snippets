@@ -22,6 +22,8 @@ _narupley_: new code signing cert that is baked into the launcher, that's it
 
 See [my github star list](https://github.com/stars/rogin/lists/mirth-related) that others in [Mirth Slack](https://mirthconnect.slack.com) found useful.
 
+There's also an ['awesome' list](https://github.com/mga-mirth/awesome-mirth) for Mirth linking to various prior projects.
+
 ## Where to start learning
 
 * Read through the [Mirth User Guide](https://docs.nextgen.com/bundle/Mirth_User_Guide_42). It has a Best Practices section which can help your message throughput and minimize DB space.
@@ -40,6 +42,7 @@ See our [new section](HowDoI.md).
 * [MirthSync](https://saga-it.com/tech-talk/2019/03/15/mirthsync+installation+and+basic+usage) is [on GitHub](https://github.com/SagaHealthcareIT/mirthsync), is it a freemium model?
 * Mirth Connect User Group maintains a [list](https://www.mcug.org/mirthvendors)
 * _pacmano_ mentioned [Shasta Networks](https://shastanetworks.com/ascent-platform/base-camp/) having a cool documentation tool
+* _Kaur Palang_'s [Git Integration plugin](https://brightcodecompany.com/gitintegration)
 
 ## MC plugin ideas
 
@@ -48,6 +51,758 @@ See [here](PluginIdeas.md).
 ## Service ideas
 
 [Various ideas](ServiceIdeas.md) as folks integrate using MC.
+
+## FHIR info and certification
+
+TODO: clean this up - Richard went looking for FHIR certification
+
+<https://www.hl7.org/fhir/overview.html>
+<https://en.wikipedia.org/wiki/Fast_Healthcare_Interoperability_Resources>
+<https://duckduckgo.com/?q=fhir+training&ia=web>
+<https://www.hl7.org/certification/fhir.cfm?ref=nav>
+<https://www.hl7.org/implement/courseList.cfm?ref=nav>
+
+## Rename a JSON field
+
+_Ryan Howk_
+Does anyone know a straightforward way to rename a JSON field with javascript going from msg to tmp, or similar?
+
+_jonb_:
+Test it. I’m 57.6% sure thats right
+
+````javascript
+msg['newfield'] = msg['oldfield'].copy()
+delete msg['newfield']
+````
+
+TODO: get the rest of _pacmano_'s code when the slack '90+ days' event occurs.
+
+_pacmano_
+chatGPT say:
+
+````javascript
+function renameKey(obj, oldKey, newKey) {
+    if (obj[oldKey] !== undefined) {
+        obj[newKey] = obj[oldKey];
+        delete obj[oldKey];
+    }
+Click to expand inline (13 lines)
+````
+
+copy() is an e4x thing that doesn't work on javascript objects
+plus assignment of one e4x object as a child to another e4x object does a deep copy anyway, so it's rarely necessary to call copy()
+AND... e4x allows you to rename elements using setName()
+which has the additional benefit of keeping the element in the same place in the child list. If you created a new xml element and deleted the old one it would get moved to the end.
+
+## Mirth paid plugin creating synthetic data
+
+_Richard_
+I remember folks complaining about the state of synthetic patient data for testing. I'm in the same boat for two of the contracts I've been on. Any of you here have a wishlist for it? File type selection (HL7, FHIR, etc.), patient count, others...
+
+_agermano_
+I think one of the nextgen paid plugins can do some of that
+
+## Getting file extension
+
+_Qwelm_
+I learned a handy trick for getting that extension when working on something else last week.
+`filename.split('.').pop()`
+That's proven much easier for me to read than doing a bunch of `filename.substring(0,filename.length - filename.lastIndexOf('.'))` type stuff. I like it because then I can handle extensions with lengths other than 3.
+
+_agermano_
+I almost always use `slice` instead of `substring`, but `split+pop` is a nice way to get the last item for a short string. No matter which method you use, you'll need special handling if there is the possibility of encountering files without an extension.
+
+## Searching for help
+
+_agermano_
+FYI, I've found that adding `site:forums.mirthproject.io` to my Google search gives better results than searching on the forums themselves.
+
+## Upgrading Mirth from 3.10 to 4.4
+
+_RunnenLate_: If I'm upgrading from 3.10 to 4.4 do i need to install all version between them to ensure the database is fine or can i just make the jump? I'm also going from Java 8 to OpenJDK 17.
+
+_Michael Hobbs_:
+_I'm cloning the database and and going to attempt the upgrade from 3.10 to 4.4 on new servers there. I'll try it next week_
+This is what I have done before. If it works which it always has for me. then make a backup of prod and do the upgrade. As we are container based it's just a matter of updating your compose file or what ever you use to deploy it and the run what ever the update command is for your container system. BTW, any channel you don't need the messages in do a remove all and give the db an hour or so to handle log transactions. This will save tons of time on db backups.
+
+## foo
+
+_Jack w/ Healthcare Integrations, LLC_
+has anyone here run into a situation, with default HL7 MLLP channels where 2 diff Mirth servers... one channel doesn't get a response from the channel??
+I see the connection established as it should be, but Mirth can't seem to send data over it... To make it MORE weird... when I do the same setup, but with HTTP Receiver/HTTP Sender, it works...
+
+_A_
+To me, it sounds like there's a network device like an IPS somewhere between the two doing "stuff". However, I have never known an IPS to allow a connection to complete TCP handshake and then just stall out the responses to the originator because something triggered a rule. If anything I figure an IPS would reset the connection which should be a different error.
+
+_Michael Hobbs_
+I'm with @A on this one. FW/IPS/IDS or some sort of proxy. HTTP/S works, Small HL7 message works. Larger HL7 message fails. I bet the larger message is bigger than a single packet can hold. I've seen IPS that will nearly always let the first packet through but based on that first packet, it kills the connection. However, since you are getting a timeout assuming that Mirth is giving you the correct error message then I'd be less liking to suspect an IPS as they generally send an RST but they could just drop the connection.
+
+I know ps360 has this weird issue where a listener has multiple connections that stay connected
+
+1. A connects it can send and receive messages
+1. When B connects it can send and receive messages but now if A sends then B will receive the reply
+
+I've never heard of this issue outside of ps360 though
+
+_Jack w/ Healthcare Integrations, LLC_
+So... small update here.  Definitely found the issue... Some type of MTU/MSS IPSEC compatibility issue between AWS PfSense and Cisco Firepower.  Any message less than 1339 bytes works... anything over, no response (fragmentation?)
+
+_Michael Hobbs_:
+
+* use ping to test, set the packet size
+* run ping test with packet size of 1400
+* run ping test with packet size of 1400 and the DF flag
+
+if test one passed and test two fails that would be the expected result.
+if test one fails then somewhere the DF flag is getting set or something is wacked with the device handling the vpn connection.
+if you have the expected results ie one pass two fails then that would suggest the DF flag is somehow being added to the mirth traffic packets.
+
+## Azure DB driver
+
+_stewart anderson_
+It seems Azure doesn't like the jtds driver, so you have to put in the microsoft sql driver as the database driver.
+
+## foo
+
+_Mitch Trachtenberg_
+
+````shell
+js> x.containsValue("2")
+true
+js> x.values()
+[2, b]
+js> x.keySet()
+[1, a]
+js> x.keySet().contains("1")
+false
+js> x.keySet().contains(1)
+false
+js>
+
+js> var x = new java.util.HashMap({"1":"2"})
+js> x
+{1=2}
+js> x.get("1")
+null
+js> x["1"]
+2
+js> x.put("a","b")
+null
+js> x
+{1=2, a=b}
+js> x.get("a")
+
+js> x.putIfAbsent("3","2");
+null
+js> x
+{1=2, a=b, 3=2}
+js> x["3"]
+js: Java class "java.util.HashMap" has no public instance field or method named "3".
+js> x.get("3")
+2
+js> x.get("1")
+null
+js>
+````
+
+_agermano_
+so, `{"1":"2"}` Rhino is converting that to an instance of `org.mozilla.javascript.NativeObject`. Mirth sees it as a regular javascript object, but that's what it really is once it's passed to Java. By specification, all javascript object properties must be a string or Symbol, but there are a lot of optimizations going on, and there is special handling for integer properties (sometimes). internally, rhino is storing that property name as a `java.lang.Integer` instead of a `java.lang.String`. when the `org.mozilla.javascript.NativeObject` is accessed by java through the `java.util.Map` interface, it must just be passing the key however it is stored internally. `x.get(new java.lang.Integer(1)` works.
+
+_Mitch Trachtenberg_
+Thank you!  Wow:
+
+````shell
+js> var y = java.util.HashMap({"1":"2"});
+js> y.put("1","3")
+null
+js> y
+{1=2, 1=3}
+js> y.get("1")
+3
+js> y.get(new java.lang.Integer(1));
+2
+(adding for future reference)
+js> y.get(1)
+null
+js> typeof 1
+number
+````
+
+_agermano_
+when you call `x[1]` it's actually using an experimental feature that is only on by default in rhino 1.7.13. It didn't exist prior to that, and it's off by default in later versions. After the HashMap has been created, in older rhino versions, it would have been wrapped in an `org.mozilla.javascript.NativeJavaObject` before passing it to the Rhino javascript context (this is what makes java objects behave like javascript objects in rhino.) In rhino 1.7.13, it's instead wrapped with an `org.mozilla.javascript.NativeJavaMap`, which allows property-like access to java Maps in a javascript style without needing to call the get method (and apparently does some type conversions in the process.) `x[1]` only works in a few of the most recent mirth versions, and it's kind of flaky, which is why it was turned back off in 1.7.14. Someone was trying to replicate Nashorn behavior but it was kind of flaky, too. It would actually be better nowadays to make a java Map emulate a javascript Map instead of a javascript object, then there's no restrictions on the key types or the risk of key/method name collisions. The same thing was added for java Lists. You can access them by index like a javascript array instead of needing to call `.get()`. That works better than the Maps, and I think that was left enabled by default. only in mirth 4.0+, that's when they started using rhino 1.7.13.
+
+## Create documentation from Mirth channels
+
+_Marco Papini_ (and others prior) asked: I was looking for a third party channel/snipets/library/software, that analyzes a mirth channel and creates a HTML documentation, with all the information.
+Do you know if such a solution exists?
+
+_pacmano_
+If you license Mirth, this is available on the support portal.   Also Shasta Networks has a cool tool.
+
+_Richard_: From the [main page](https://www.community.nextgen.com/), on the left is a _LINKS_ section. Selecting the _Channel Report Tool_ lands you [here](https://channelreport.nextgen.com/).
+
+## What does it look like when a channel table becomes too big
+
+See [sample 1](too-big-sample-1.txt), [sample 2](too-big-sample-2.txt), and [sample 3](too-big-sample-3.txt). Messages stop processing, with the latest destination being set to RECEIVED. Does not change, even when no other messages in queue.
+
+## Advanced Clustering issues
+
+### Sept 2023
+
+_RunnenLate_:
+
+````text
+com.mirth.connect.donkey.server.StartException: Failed to start channel  (c6265282-bdc1-4534-aaa9-c91ceabd3547).
+Caused by: com.mirth.connect.donkey.server.ConnectorTaskException: org.quartz.ObjectAlreadyExistsException: Unable to store Job : 'c6265282-bdc1-4534-aaa9-c91ceabd3547.PollConnectorc6265282-bdc1-4534-aaa9-c91ceabd3547', because one already exists with this identification.
+ at com.mirth.connect.donkey.server.channel.PollConnector.start(PollConnector.java:45)
+ at com.mirth.connect.donkey.server.channel.Channel.start(Channel.java:754)
+ ````
+
+_jonb_
+That means that you have a poller channel that is either in a stuck state or you have the channel starting while you’re trying to deploy it again
+Options:
+
+1. Make sure the channel is halted and undeployed
+1. Run [this](https://gist.github.com/jonbartels/27b09865b2b48051920564af83fca09e) in a channel - it’ll dump your quartz jobs and help determine if you have a stuck job
+1. Restart MC
+
+### Aug 2023
+
+_RunnenLate_
+So i got a big problem and mirth is dying on me. Anyone know what i can do regarding this
+
+````text
+[2023-08-10 02:38:45,687]  ERROR  (com.mirth.connect.plugins.clusteringadvanced.server.AdvancedClusterEngineController:298): Failed to retrieve channel statuses.
+java.lang.NullPointerException
+````
+
+* I can't get any channel to load
+* two servers in the cluster
+* if i drop one out to reboot the server it starts on the other
+* running v3.10.1
+* the dashboard won't load
+* channels aren't deploying
+
+His solution:
+so i guess we were forced to just power them both off and back on. and the channels came back. some of the setting aren't working but i just don't care right now
+
+Interesting comment by _Roger Schaefer_:
+One thing you might check is confirming `/opt/mirth-connect/appdata/server.id` is different between the nodes. If you try to start 2 instances with the same `server.id`, it will cause "unexpected behavior". We experienced this issue when restoring a copy of the first node to the second node for example. As I understand it, mirth creates that file and gens and ID on first load, but if it is already there, it does not update with a unique one, so if you clone or use an AMI backup or whatever it will confict.
+
+## foo
+
+agermano
+the readme for the docker image [recommends](https://hub.docker.com/r/nextgenhealthcare/connect#the-appdata-folder) putting the appdata directory in a persistent volume. The dashboard statistics are kept per server id, and if you did not give the new server the same id as the old one, then it will look like all of your statistics disappeared. the `server.id` file is also located in the `appdata` folder. `keystore.jks` is another file in `appdata` that you probably want to retain during an upgrade
+
+pacmano
+  11 hours ago
+<https://hub.docker.com/r/nextgenhealthcare/connect#using-volumes> In the OPs defense, that language should be stronger.
+
+agermano
+There should probably be a wiki page or something spelling out all of these things that you need to consider when upgrading to a new server and why each piece is necessary. with special consideration for container-based installs. like recommended mirth.properties settings, and things
+
+## foo
+
+tarmor
+  3 hours ago
+Half a day banging my head to desk, wall, keyboard and google, to finally figure out, that for some reason I need to add the [0]  to make this work  delete nextSegment[0];  where nextSegment was previously acquired like this msg.child(index); . It just doesn't make sense to me.
+1 reply
+
+agermano
+  3 hours ago
+delete nextSegment deletes the variable to which the segment (actually an XMLList containing the segment) is assigned. delete nextSegment[0] tells the object assigned to nextSegment (an XMLList in this case) to delete the item associated with index 0, and e4x does some magic when it deletes the xml element from the list that also removes the element from its parent document.
+
+## foo
+
+Richard
+  1 hour ago
+Which third party vendors can give me insight into my slow channel processing, as well as options to resolve? my employer is looking for products and/or consultants.
+
+2 replies
+
+pacmano
+  1 hour ago
+My company (<https://diridium.com/>),
+@joshm’s (<https://www.innovarhealthcare.com/>),  
+@Jack w/ [Healthcare Integrations, LLC](https://www.healthcareintegrations.com) even if he can’t sort out IPSec :stuck_out_tongue_winking_eye:),
+@the_Ron’s (<https://consultzen.com/>, but not sure they do troubleshooting engagement anymore, maybe DM @briank). But I might share your platform details to narrow that down.
+
+## foo
+
+_Zubcy_
+Hi Team, any thoughts on how to reprocess messages but just the last one for each account?
+Suppose, there are 10 events (ADT-A04, ADT-A06, ADT-A08....) of an account number and ADT-A03 is the latest message received...
+So, how can we reprocess the latest msg (ADT-A03) of that account? and also how can we do this for all accounts processed till now? Can we do this through Mirth database?
+
+_joshm_ with the [gist solution](https://github.com/tiskinty/Mirth-Connect-Resources/blob/9793c7371d36db7a644ed2eff477ade0c461822e/ReprocessMessages.js)
+
+## Clean way to reject messages based on the HTTP event type/verb
+
+_joshm_
+I’m looking for a clean way to reject messages based on the HTTP event type/verb. I only want to accept POST transactions on my channel and I don’t have control over the infrastructure of this specific engine. Which step would something like that live in? Seems like we tried a filter, but that didn’t work because we had a source transformer script already. I made it work in my auth script and just returned auth fail but was thinking there may be a better way. I’ll test with modifying the existing source transformer to only execute for a POST. The GET traffic I’m getting is of unknown origin, so IDGAF what the response to that system is.
+
+I really want $(vendor) to allow me to use mutual TLS on that endpoint and that would fix itself.
+
+so the filter is not working because I’m getting an error for “Empty JSON String”. It appears to throw an error before my filter script ever runs. No pre-processor script here.
+
+so I figured it out. I have to set my input data type to RAW. If it’s set to JSON, it will blow up no matter what. that’s stupid and I’ll have to re-write a lot of channels I inherited.
+
+_pacmano_
+I think that was mentioned some time ago related to other questions and sending meaningful error responses back to the caller. e.g. always accept RAW and try catch parse it and reply with a friendly error message if not expected format. really goes for everything, context path, params, headers, methods, IMHO
+
+_joshm_
+Figured out a workaround without having to change the whole channel code. I just added a preprocessor script to return "{}" when message is null/empty. is it the best way, no - probably not. does it work as a temporary solution to stop the errors until we can re-write the source transformer, yes. oddly, this channel doesn’t even return a response payload, just auto-responds before processing.
+
+_chris_
+If you have respond-before-processing, then your fileter will do nothing. You need to "respond after source filter/transformer" and I think you will have to do less work. You should not have to set type=RAW.
+
+_pacmano_
+if you want friendly error messages you need to do RAW. i.e. return a JSON response with what is actually wrong.
+
+_joshm_
+if I don’t fix it in pre-processing, then I have to set it to RAW or I get channel errors for blank JSON string.
+
+## foo
+
+_Sean Phelan_
+Anyone know if you can get the current contents of a channel's `globalChannelMap` via the API? We store configuration that only gets loaded on deployment.
+
+_jonb_
+`/extensions/globalmapviewer/maps/{channelId}` is the API path
+`/extensions/globalmapviewer/maps/all`
+
+Quoting _agermano_'s [link](https://forums.mirthproject.io/forum/mirth-connect/support/7041-mirth-tools-user-defined-functions?p=95534#post95534):
+
+Access `globalChannelMap` of any channel
+
+Sometimes you need to alter the `globalChannelMap` of a running channel but do not want to stop it.
+
+````javascript
+function $gcById(id, key, value) {
+ var maps = com.mirth.connect.server.util.GlobalChannelVariableStoreFactory.getInstance();
+ var map;
+ if (maps.globalChannelVariableMap.containsKey(id)) {
+  map = maps.get(id);
+ }
+ else {
+  throw "globalChannelMap not found for channel: " + id;
+ }
+
+ if (arguments.length == 2) {
+  return map.get(key);
+ }
+ else {
+  return map.put(key, value);
+ }
+}
+````
+
+Usage is similar to `$gc`, except also pass the `channelId` of the channel for which you want to access or update the `globalChannelMap`.
+
+````javascript
+$gcById('388f7dfc-4a1a-45a6-b89b-91faacd67044', 'test', 'added from another channel');
+logger.info($gcById('febe3d1e-97d6-47eb-bfe0-ca6bf895c967', 'importantMap').toString());
+````
+
+## CDATA tags for SQL queries
+
+_Kirby Knight_
+Anyone using CDATA tags for querying SQL from Mirth Connect?  What's the advantages/disadvnatages of doing it this way? Example:
+
+````javascript
+//encounters
+ var encountersQuery = (<r><![CDATA[
+  
+  SELECT v.PatientDurableKey AS patientDurableKey, ddStartDate.dateValue AS startDate, v.visitKey,v.appointmentStatus, v.visitType, v.portalReasonForVisit, pd.NPI, pd.durableKey AS providerDurableKey, pd.name AS encounterProviderName, pd.type AS physicianType, pd.primaryDepartmentEpicId, pd.primaryDepartment
+  FROM VisitFact v
+    JOIN DateDim ddStartDate ON v.EncounterDateKey=ddStartDate.DateKey AND ddStartDate.dateValue IS NOT NULL
+    JOIN ProviderDim pd ON v.PrimaryVisitProviderDurableKey = pd.DurableKey AND pd.isCurrent=1
+    JOIN #patientScope ps ON v.patientDurableKey = ps.patientDurableKey
+  WHERE 1 = 1
+  AND v.AppointmentStatus NOT IN ('Canceled','Left without seen','No Show')
+  AND v.Status_LastUpdatedDate >= 'getPatientsChangedSinceDateTimePlaceholder'
+  
+ 
+  ]]></r>).toString();
+````
+
+_agermano_
+Oh, that's a good idea. The advantage is that you don't need to escape `&` or `<` in your SQL. The disadvantage is that it's ugly when you don't need it lol. Whenever mirth gets around to upgrading to rhino 1.7.14, it has JavaScript string template literal support, and we won't need to use e4x for this anymore.
+
+_pacmano_
+What is the syntax? `v.AppointmentStatus = {$c('thever')}`  ?
+
+_Kirby Knight_:
+
+````javascript
+ //encounters
+ var encountersQuery = (<r><![CDATA[
+  
+  SELECT v.PatientDurableKey AS patientDurableKey, ddStartDate.dateValue AS startDate, v.visitKey,v.appointmentStatus, v.visitType, v.portalReasonForVisit, pd.NPI, pd.durableKey AS providerDurableKey, pd.name AS encounterProviderName, pd.type AS physicianType, pd.primaryDepartmentEpicId, pd.primaryDepartment
+  FROM VisitFact v 
+    JOIN DateDim ddStartDate ON v.EncounterDateKey=ddStartDate.DateKey AND ddStartDate.dateValue IS NOT NULL 
+    JOIN ProviderDim pd ON v.PrimaryVisitProviderDurableKey = pd.DurableKey AND pd.isCurrent=1
+    JOIN #patientScope ps ON v.patientDurableKey = ps.patientDurableKey 
+  WHERE 1 = 1
+  AND v.AppointmentStatus NOT IN ('Canceled','Left without seen','No Show')
+  AND v.Status_LastUpdatedDate >= 'getPatientsChangedSinceDateTimePlaceholder'
+  
+ 
+  ]]></r>).toString();
+
+ encountersQuery = encountersQuery.replace(new RegExp('getPatientsChangedSinceDateTimePlaceholder','g'),channelMap.get('getPatientsChangedSinceDateTime'));
+ queriesJson.encounters = encountersQuery;
+````
+
+_agermano_
+This only works for static SQL. Which is a disadvantage if you aren't using or can't use prepared statements with `?` as placeholders. There are certain things, like table name, that you can't parameterize.
+
+_Kirby Knight_
+Any concerns with performance, doing it this way?
+
+_agermano_
+I wouldn't expect a noticeable difference in performance. I wouldn't use CDATA if you're planning on doing the regexp replace afterwards as java already supports parameterized queries
+`AND v.Status_LastUpdatedDate >= ?`
+but if you want to inline the value, this works if you aren't using CDATA
+`AND v.Status_LastUpdatedDate >= {$c('getPatientsChangedSinceDateTime')}`
+
+_Anthony Master_
+I use a mixture of CDATA and concatenated strings. For the most part, just use concatenated string. Just remember when you use variabes inline to never trust inputs, which for most of us here should be a given.
+
+_agermano_
+that's why parameterized queries should be the first choice here. it automatically sanitizes the input
+
+_Anthony Master_
+agreed. When I say concatenated strings, I meant more of this:
+
+````javascript
+var query = ''
++'SELECT'
++'  id,'
++'  name'
++'FROM'
++'  myTable'
++'WHERE'
++'  id=?'
+````
+
+This is a poor example because it is a short query, but for longer queries I prefer CDATA.
+
+_pacmano_
+I just escape the XML in the rare cases there is a conflict. I follow this pattern for the most part (no escaped xml needed in this one), that query in well fell swoop in a response transformer inserts an array of object to rows in postgres.
+
+````javascript
+
+var sql = <>
+INSERT INTO integration.allscripts_touchworks_document_backfill_logs (client_code, practice, document_id, patient_id, status, documentsource, document_json)
+SELECT
+    '{$c('clientcode')}',
+    '{$c('practice')}',
+    (obj->>'DocumentID')::bigint,
+    (obj->>'patientid')::bigint,
+    obj->>'Status',
+    'INTEGRATION',
+    obj
+FROM jsonb_array_elements(?::jsonb) AS obj
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM integration.allscripts_touchworks_document_backfill_logs
+    WHERE client_code = '{$c('clientcode')}'
+        AND practice = '{$c('practice')}'
+        AND document_id = (obj->>'DocumentID')::bigint
+        AND patient_id = (obj->>'patientid')::integer
+)
+</>.toString();
+
+var params = new java.util.ArrayList();
+params.add(JSON.stringify(list_of_documents))
+````
+
+not all parameterized though. just the json blob which is all I care about from a data cleanliness perspective.
+
+## Info on FHIR connectors
+
+_Arun Kumar P_
+What would be the cost for purchasing FHIR connector? I believe earlier it used to be open source and now it is paid
+
+_pacmano_
+Call sales. And I don’t think there is a standalone option, you require minimum the Gold license pack. FHIR is just calling APIs after all, and <https://hapi.fhir.org/> sorta tells you everything you need to do. Standing up inbound FHIR services is a very different topic of course.
+
+_joshm_
+you can use a simple http connector and build the JSON required. You can also use HAPI FHIR java library which is what the plugin uses under the covers. Regarding inbound FHIR services, depending on what you need to do with them, yea. If you just need to parse whatever you get, it’s not too bad. If you need to proxy that to a FHIR repo somewhere, that can get a bit more complicated. there have been a lot of improvements over the old free version.
+
+_Kirby Knight_
+If you are querying existing FHIR servers for data, does it make the most since to just do FHIR API calls from Mirth or is there an advantage to learning and using the HAPI FHIR Java library?
+
+_joshm_
+if you need to parse it, there is an advantage (POJOs w/javadocs instead of JSON) but if you’re passing through, no
+
+_jonb_
+HAPI FHIR as a project is also far more expansive than just the library. their HAPI FHIR server is a pretty quick way to get a FHIR data store up and running.
+
+_joshm_
+I haven’t used it in a long time, but they used to have a quick start project where you could literally just run a build and upload your war to Tomcat or other engine of choice and have a nice UI and DB for your repo.
+
+## Create one OBX segment from multiple OBX segments
+
+_Rodger Glenn_
+hello all i am needing to create one OBX segment from multiple OBX segments. If any one knows of a good link. I keep searching but i keep finding the one to make multiples from One OBX.
+
+_Anthony Master_
+is it coded data or string data?
+
+_Rodger Glenn_
+String data
+
+_Anthony Master_
+So I have done something similar. Loop over all segments (in case multiple OBX groups) and for each group, create a new string, and then delete each OBX and insert a new OBX after completing the OBX group.
+
+_tiskinty_
+are you combining all of the OBXs in the message or a specific group?
+
+_Rodger Glenn_
+all of `OBX.5` into one
+
+_agermano_
+How do you need to combine them?
+
+_pacmano_
+example would be helpful. screenshot before and after. Seems it is a simple iteration, appending to OBX 1 and deleting the others as you append. unless you have groups of OBXs.
+
+_agermano_
+Is this a report? Does each OBX represent a line? How will the line breaks be represented after there is a single segment?
+
+_Rodger Glenn_
+the system i am working with only wants one OBX segment will of the OBX.5 in the one OBX line.
+
+_agermano_
+so you need to convert repeating OBX segments to repeating OBX-5 fields
+
+_Rodger Glenn_
+Yes. I tried this but but it doesn't look like is it making the correct breaks.
+
+````javascript
+var len=msg['OBX'].length();
+for(i=0;i<len;i++) {
+  for(j=i+1;j<len;j++) {
+    if(msg['OBX'][i]['OBX.3']['OBX.3.1'].toString()==msg['OBX'][j]['OBX.3']['OBX.3.1'].toString()) {
+      msg['OBX'][i]['OBX.5']['OBX.5.1']+=msg['OBX'][j]['OBX.5']['OBX.5.1'].toString();
+      delete msg['OBX'][j];
+      j=j-1;
+    }
+    len=msg['OBX'].length();
+  }
+}
+````
+
+_agermano_
+I haven't tested, but try this
+
+````javascript
+msg.OBX[0]['OBX.5'] = msg.OBX['OBX.5']
+msg.OBX = msg.OBX[0]
+````
+
+The first line should assign all of the OBX-5 values as a repeating list on the first OBX segment, and the second line should remove all OBX segments except for the first one.
+
+_Rodger Glenn_
+Okay that looks right.
+
+_pacmano_
+I would think you would want line feeds
+
+_agermano_
+I've seen systems use repeating fields to represent line breaks in OBX segments. It's not that uncommon.
+Just wanted to point out that the solution is not as easy as the one I posted if you need to deal with multiple OBX groups as _@Anthony Master_ mentioned above.
+
+## foo
+
+Karel
+  11 days ago
+Hi, How do I deploy a File Reader channel that only runs when triggered from another channel? I have Interval / Time / Cron as an option. I tried a Cron job with a specific year in the past but this refuses to start the channel :slightly_smiling_face: (edited)
+
+18 replies
+
+jonb
+  11 days ago
+What is the use case?
+Channel A triggers the file reader and causes the files to be read?
+OR
+Channel A sends a message to the file reader and the file reader processes that message but does not really read any files?
+
+Karel
+  11 days ago
+first use case
+
+Karel
+  11 days ago
+second channel processes a bunch of pdf/xml files (edited)
+
+Karel
+  11 days ago
+first channel processes a trigger file which can be modified by another department
+
+Karel
+  11 days ago
+@jonb
+
+jonb
+  11 days ago
+OK. I know I have seen that use case on Github or the forums before but I do not remember the solution.
+
+jonb
+  11 days ago
+Having Channel A  start/stop the file reader might work
+
+Karel
+  11 days ago
+I asked this question before here in Slack. But I just now started implementing the solution :slightly_smiling_face:
+
+Karel
+  11 days ago
+@jonb
+ how would I know when to stop the second channel? It needs to stop when all files are processed (not just one message/file)?
+
+jonb
+  11 days ago
+Thinking…
+I found <https://github.com/nextgenhealthcare/connect/issues/4810> which describes the feature you want, but this feature does not exist yet
+
+jonb
+  11 days ago
+As for the batch complete feature - that exists now <https://github.com/nextgenhealthcare/connect/issues/2085>
+Look in your mapping tabl for batchComplete
+:heart:
+1
+
+Karel
+  11 days ago
+Allright I figured it out. trigger channel does conditional check and triggers second channel through ChannelUtil.startChannel. Second channel with initalial State "Stopped" and Poll on start "Yes". In the post processor script I've put
+if($('pollComplete')) {
+ ChannelUtil.stopChannel('d03a6c59-669a-49aa-b361-5fa7939cabc2');
+}
+:+1::skin-tone-4:
+1
+
+Karel
+  11 days ago
+Which stops the channel once all files are processed. Waiting for the next run. Only problem I see is another Mirth admin manually running the transfer channel
+
+## foo
+
+_ThisIsTheWay_
+Hello everyone! I need to get a total count of interface messages received and sent for all channels in our production instance per month. The client API has a call for this, but it's only one channel at a time. Any advice on running this for all channels?
+
+_jonb_
+[This daily volume report](https://gist.github.com/jonbartels/b961574b2043b628f1b0fd96f440179b) should be a starting point in Postgres.
+
+_joshm_
+Stats are calculated by individual channel. You’d have to build something to get it for all channels. Kinda like what
+@jonb posted or you can use Mirth to build a channel to query its own API for each channel. Just make a call to get the list of channels, then iterate that list to call the stats API for each entry.
+If you are interested in a solution that does this all out of the box for you and provides dashboards, visuals, etc. [my company](https://www.innovarhealthcare.com) does have a service offering for that already built. We have a set of channels that can grab that and more. We can even dig into the Mirth paid SSL Manager extension to get expiration dates on your certificates and such.
+
+## foo
+
+_Sean Phelan_
+Anyone experience issues with SFTP reader throwing an error when a filename contains a unicode character? The following message just repeats in our logs. I can  rename the filename but hoping for a solution that does not require manual work.
+
+````plaintext
+ERROR  (com.mirth.connect.connectors.file.FileReceiver:27): Unable to dispatch message to channel 16133e05-80ac-4227-8d58-4075544bf4b4. File: bad_filename_with_unicode_character.xml
+2: File not found: /sftp/bad_filename_with_unicode_character.xml`
+````
+
+Filenames use the patients name. The file that is causing issues appears to have ñ in the last name.
+Tried using cyberduck and had a similar problem. It errored. ... but changed the encoding to windows 1258 and everything worked correctly.
+
+_jonb_
+Does changing the encoding in Mirth work?
+
+_Sean Phelan_
+I was hoping that would fix it as well.. but no luck. I vaguely remember being able to set jsch settings as configuration settings in the reader. wondering if there is any setting I can use  to change the encoding ... just cant find a list of possible settings
+
+## foo
+
+_stewart anderson_
+hi guys. I will be deploying Mirth into a new green field site and wondered what best pradtices you like to follwo for deploying mirth - mostly in prod, I will be using the zip version, creating the services, RAM I can work out, but do you do anything specific like split the logs to different disk, etc?
+
+_jonb_:
+
+1. PRUNING
+1. Give it a good server name and set the environment
+1. monitoring
+3.1. JVM
+3.2. basic OS stats
+3.3. MC itself
+1. Some sort of deployment plan so you’re cloning changes into PROD and not touching PROD manually
+1. Don't use Derby :smile:. PSQL is best but SQL Server is nice too
+
+Sending logs to a logging services is best but remember logs can have PHI
+
+_Kirby Knight_
+Infrastructure as code, however you plan on doing it. In Azure I used ACS to deploy Mirth in containers.
+
+_stewart anderson_
+it will be in azure so I think  they will use SQLServer. I tried PSQL and was not confident I knew what I was doing WRT cleanup, in that whatever I tried to do to get rid of old tuples, the DB size didn't seem to reduce! just kept growing. for deployment I have written some stuff around mirthsync and for config wil be doing some work to edit json config files for global map etc. (both in powershell)
+
+## foo
+
+_pacmano_
+Has anyone seen an S3 Writer slow down after a few thousand messages? after a channel restart it seems to process normally.  I have used attachments, not used attachments, used s3fs, not used s3fs. A command line s3 speed test is very fast, mirth not so much.
+
+[days later]
+
+after all that…. it was a missing index on a table (apparently a bigserial column though) on the post S3 write to db recording the fact the file was written.
+
+## foo keystore
+
+_evan_
+Does mirth ever update the keystore settings in mirth.properties on its own?  I’m testing the update from 3.11 to 4.3 and keep ending up with a broken jks keystore.  The only way I’ve found of fixing it is to nuke the keystore completely so it gets regenerated.  I didn’t run into anything like this the last time we updated from 3.4 to 3.11
+
+_jonb_
+What settings are you using that are not defaulted? What changes, if any, do you have to your keystore? In what way is the keystore broken?
+Note that MC ALWAYS reads+writes the keystore on startup even if it didn’t have to change anything - <https://github.com/nextgenhealthcare/connect/issues/5467>
+
+_evan_
+The keystore settings in mirth.properties on this particular instance seem to get changed from the default values. I know this because our saved configuration that is used in our instances uses the default values for keystore.storepass and keystore.keypass present on a fresh install, so I’d expect to see those values when I look at this particular instance (after running our normal install script to load 3.11 and drop in the appropriate config files). That is what I’m confused about. The keystore itself being modified makes perfect sense.
+
+_jonb_
+OH <https://github.com/nextgenhealthcare/connect/commit/66f1518dd585dbe5a515411ad069214961ac3dfd>
+You have `81uWxplDtB` and its being changed to something else right?
+
+_evan_
+Yes, not using a container. actually, the servers are likely VMs
+
+jonb
+<https://github.com/nextgenhealthcare/connect/wiki/3.7.0---Upgrade-Guide#keystore-passwords>
+I can’t explain why you’re running into it now and not previously but that exactly matches what you are seeing.
+
+_evan_
+Yes that seems to be it. If I’m reading it correctly:
+
+* Updating from 3.4 to 3.11 -> keystore passwords left unchanged even if they’re set to the default
+* Fresh install of 3.7 onwards -> passwords changed/randomized if the keystore is being created for the first time and the passwords are set to the defaults
+* Updating 3.7 onwards and the password is not the default -> I need to manually update mirth.properties or it will break
+
+_jonb_
+[DefaultConfigurationController](https://github.com/nextgenhealthcare/connect/blob/e0db5497aabb94c41071e4a098580e660a1d5d8e/server/src/com/mirth/connect/server/controllers/DefaultConfigurationController.java#L1178-L1186)
+Does your keystore exist when Mirth launches for the first time?
+
+_jonb_
+It only generates new passwords IF the keystore DOES NOT exist already
+
+_evan_
+Right, that’s what I said. The keystore already exists when I update from 3.11 to 4.3, but it’s secured with a non-default password per the behavior outlined in the links you’ve shared. In this case, it seems I need to manually migrate those values from the old config to the new, because when mirth is first installed/updated, mirth.properties is reverted back to a default state. Since making my original post, I verified I was able to access the instance by manually migrating those properties so it could access the existing keystore. just wanted to understand what was going on as I didn’t run into this before.
+
+_jonb_
+hmm… is [this](https://github.com/nextgenhealthcare/connect/blob/e0db5497aabb94c41071e4a098580e660a1d5d8e/server/src/com/mirth/connect/server/Mirth.java#L224) relevant?
+I’m going to actually tag @narupley here. his fingerprints are on this code and he is good at explaining things if he’s around
+
+_evan_
+Thanks for taking a look. What I’m seeing makes a lot more sense now.  The main thing I need to figure out is whether I need to migrate those keystore properties on a per-instance basis when we update, right now it’s looking like I will.  Not ideal but it also sounds like I could do one-time migration of all instances to a non-default storepass/keypass combo and not need to worry about it again in the future
+
+## Node.js CDA Parser
+
+_pacmano_: For community use if needed, Amida Tech’s [BlueButton](https://github.com/amida-tech/blue-button) CDA parser, via a simple node.js app API listener. Dockerfile included. Thanks to _Michael Hobbs_, _agermano_, and _jonb_ for some QA: <https://github.com/pacmano1/bluebutton>. Not a fork, just uses Amida’s library.
 
 ## FHIR client using JS
 
@@ -127,6 +882,17 @@ I’ve heard there is a known issue with certain versions of Java and the FHIR p
 
 _James Oakes_
 That worked!
+
+## FHIR server to test against
+
+_Kirby Knight_
+Can anyone recommend a FHIR server to test against? I am looking for something we good test patient data(demographics, insurance, diagnosis, procedures, and medications) to work with.
+
+_joshm_
+<https://hapi.fhir.org/>
+
+_agermano_
+_@kayyagari_'s got it in his slack profile <https://fhir.sereen.io>
 
 ## Generating HL7 and FHIR messages
 
@@ -595,7 +1361,7 @@ If your response is generated from the completion of all destinations then you�
 Firing all 5 destinations in parallel and waiting for the response is possible but its tricky to wire up. Is that relevant to your use case? Are the destinations in parallel or sequential?
 
 _Genarro_
-All the destinations are separate and there is no daisy chaining, but some endpoints call other endpoints via Javscript using `router.routeMessage()`
+All the destinations are separate and there is no daisy chaining, but some endpoints call other endpoints via Javascript using `router.routeMessage()`
 It’s a bit of a mess that needs a restructuring. It’s all happening in one channel. I’d like to break that out, but can’t see how I could send a response back across channels to the original request.
 @jonb If I can clean things up and have each destination independent of all the others, is there anything else I need to consider for that parallel approach that you mentioned above?
 
@@ -920,6 +1686,23 @@ I think we need message order preservation
 
 ## Error strings and their solutions
 
+### Module used for TIFF does not export
+
+_RunnenLate_
+upgraded mirth and my tiff stuff is all broken. java 1.8 to openJDK 17, version 3.10.1 to 4.4. This is related to moving from java 8 to java 17 I'm sure.
+
+````text
+DETAILS: Wrapped java.lang.IllegalAccessException: class org.mozilla.javascript.MemberBox cannot access class com.sun.imageio.plugins.tiff.TIFFImageReader (in module java.desktop) because module java.desktop does not export com.sun.imageio.plugins.tiff to unnamed module @68826d2d
+ at 6ffa9550-bc0a-4552-b948-2d293c6ef348_JavaScript_Writer_1:1916 (convertPDFtoTIFFFromHex)
+````
+
+_pacmano_
+chatGPT say `--illegal-access=permit --add-exports java.desktop/com.sun.imageio.plugins.tiff=ALL-UNNAMED`
+
+_RunnenLate_
+In case anyone searches this again, looks like java 17 doesn't support `--illegal-access=permit` and you need to use
+`--add-opens=java.desktop/com.sun.imageio.plugins.tiff=ALL-UNNAMED` instead of `--add-exports`. Found [this](https://github.com/nextgenhealthcare/connect/issues/4602) which was helpful.
+
 ### MCAL cert error after adding new cert from RapidSSL
 
 Error text: `javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target`
@@ -1078,9 +1861,12 @@ Brainstormed options:
 * Plotly js is a marvel.
 * javafx can do charts and graphs
 
+In 2023, _Richard_ wrote a PowerShell script to query Mirth and output a `.dot` graph file that's processed with GraphViz.
+
 ## HL7 Escaping rules
 
-See [here](https://docs.intersystems.com/latest/csp/docbook/DocBook.UI.Page.cls?KEY=EHL72_ESCAPE_SEQUENCES) and [here](https://www.hl7plus.com/Help/Notepad/index.html?hl7_escape_rules.htm).
+First list via [InterSystems](https://docs.intersystems.com/latest/csp/docbook/DocBook.UI.Page.cls?KEY=EHL72_ESCAPE_SEQUENCES).
+Second list via [HL7+ Notepad](https://www.hermetechnz.com/Documentation/HL7Plus/Notepad/index.html?hl7_escape_rules.htm) (formerly [here](https://www.hl7plus.com/Help/Notepad/index.html?hl7_escape_rules.htm) which hung on its tool site).
 
 ## Polling issue when using clustering plugin
 

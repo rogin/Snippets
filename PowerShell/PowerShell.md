@@ -2,7 +2,7 @@
 
 ## GitHub star list
 
-See [here](https://github.com/stars/rogin/lists/rust).
+See [here](https://github.com/stars/rogin/lists/powershell).
 
 ## Tracing commands
 
@@ -72,7 +72,7 @@ Where() accepts [multiple params](https://mcpmag.com/articles/2015/12/02/where-m
 ````powershell
 @(1,2,3).Where({$_ -gt 0}, 'first')
 #1
- @(1,2,3).Where({$_ -gt 0}, 'first', 2)
+@(1,2,3).Where({$_ -gt 0}, 'first', 2)
 #1
 #2
 @(1,2,3).Where({$_ -gt 10}, 'first')
@@ -90,6 +90,14 @@ See [here](https://learn.microsoft.com/en-us/powershell/module/microsoft.powersh
 For help, type "get-help"
 "@
 ````
+
+### Prefer generic List over ArrayList
+
+[Comment](https://old.reddit.com/r/PowerShell/comments/14yjs0u/total_powershell_noob_looking_for_some_quick/jrth4of/) to prefer `$NewList = [System.Collections.Generic.List[PSObject]]::new()` over `New-Object System.Collections.ArrayList` to avoid silencing `Add()` returning true/false.
+
+### Regex
+
+Always going back to [the docs](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_regular_expressions?view=powershell-7.4)
 
 ## Gotchas
 
@@ -205,19 +213,19 @@ Enter-PSSession -computername $env:COMPUTERNAME -Configuration PowerShell.7
 - I need a PS script to run as admin on a fresh Win10 box to keep the system updated. How to configure the script to allow user to click .ps1 file to run, and have it prompt for creds? Adding `#Requires -RunAsAdministrator` did not work, plus the default PS v5.1 running it failed to parse simple lines correctly, e.g. "& control update" to open the Windows update panel.
 - Running a scheduled PS script without a popup. There are [ways](https://superuser.com/questions/62525/run-a-batch-file-in-a-completely-hidden-way) to wrap with VBS.
 
-## Review one liners
-
-Pull anything of value from [here](https://www.red-gate.com/simple-talk/sysadmin/powershell/powershell-one-liners--collections,-hashtables,-arrays-and-strings/).
-
-## Review operators
-
-Read over the full [page](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_Operators?view=powershell-7.3). The subexpressions were interesting.
-
 ## Range operator
 
 See [here](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_Operators?view=powershell-7.3#range-operator-).
 
+## Predictive IntelliSense
+
+Install PSReadLine and you can get a list view of selections based on your history by pressing F2 - [details](https://learn.microsoft.com/en-us/powershell/scripting/learn/shell/using-predictors?view=powershell-7.3).
+
 ## Helpful links
+
+[Practice and Style Guide](https://poshcode.gitbook.io/powershell-practice-and-style/introduction/readme)
+
+Local book [PowerShell Notes for Professionals](PowerShellNotesForProfessionals.pdf) from [here](https://goalkicker.com/PowerShellBook/)
 
 [Powershell cheat sheet](https://devblogs.microsoft.com/powershell-community/cheat-sheet-console-experience/)
 
@@ -226,3 +234,33 @@ See [here](https://learn.microsoft.com/en-us/powershell/module/microsoft.powersh
 [Unit testing vs integration testing](https://www.guru99.com/unit-test-vs-integration-test.html)
 
 [Info on system testing](https://testsigma.com/blog/system-testing-vs-integration-testing/) and [another](https://u-tor.com/topic/system-vs-integration)
+
+[Local cheatsheat](powershell-cheat-sheet-ramblingcookiemonster.pdf) from [here](https://ramblingcookiemonster.github.io/images/Cheat-Sheets/powershell-cheat-sheet.pdf)
+
+[Gist cheatsheet](https://gist.github.com/pcgeek86/336e08d1a09e3dd1a8f0a30a9fe61c8a)
+
+[Common Cmdlets with examples](https://www.pdq.com/powershell/)
+
+## Best Practies
+
+Azure has a [module best practices](https://github.com/Azure/azure-powershell/blob/main/documentation/development-docs/design-guidelines/module-best-practices.md) as other bests.
+
+PoshCode has a [best practices](https://github.com/PoshCode/PowerShellPracticeAndStyle)
+
+MS [strongly encouraged development guidelines](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/strongly-encouraged-development-guidelines). [Using WriteObject](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/strongly-encouraged-development-guidelines?view=powershell-7.3#support-the-passthru-parameter) for `-PassThru` caught my eye.
+
+MS [Standard Cmdlet Parameter Names and Types](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/standard-cmdlet-parameter-names-and-types?view=powershell-7.3)
+
+## Unsorted
+
+<https://learn-powershell.net/2012/11/09/powershell-and-wpf-textbox/>
+
+<https://old.reddit.com/r/PowerShell/comments/17lah5l/what_have_you_done_with_powershell_this_month/k7cxp54/>
+
+## Review one liners
+
+Pull anything of value from [here](https://www.red-gate.com/simple-talk/sysadmin/powershell/powershell-one-liners--collections,-hashtables,-arrays-and-strings/).
+
+## Review operators
+
+Read over the full [page](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_Operators?view=powershell-7.3). The subexpressions were interesting.

@@ -4,7 +4,8 @@
 <details>
   <summary>Table of Contents</summary>
   <ol>
-    <li><a href="#view-messages-in-thread-queues">Dump scheduled jobs</a></li>
+    <li><a href="#export-and-import-from-clipboard">Export and import from clipboard</a></li>
+    <li><a href="#view-messages-in-thread-queues">View messages in thread queues</a></li>
     <li><a href="#dump-scheduled-jobs">Dump scheduled jobs</a></li>
     <li><a href="#image-conversion">Image conversion</a></li>
     <li><a href="#mirth-uis-from-json-config">Mirth UIs from JSON config</a></li>
@@ -13,9 +14,14 @@
   </ol>
 </details>
 
+## Export and import from clipboard
+
+_jonb_
+ya know what plugin I want? Export and import from clipboard. I’m poking at an MCVE and being albe to just copy-paste the channel code would be faster than moving files.
+
 ## View messages in thread queues
 
-Kirby Knight
+_Kirby Knight_
 I wish there was a way to see what messages are queued on each thread. Is there a way to configure a channel to log or display this information?
 
 (back and forth on how to get the expected data)

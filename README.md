@@ -6,4 +6,4 @@ Snippets from the Internet for later reference.
 
 1. [NextGen Connect](Connect/Mirth.md) (aka Mirth)
 2. [Networking](Networking.md)
-3. [PowerShell](PowerShell.md)
+3. [PowerShell](PowerShell/PowerShell.md)

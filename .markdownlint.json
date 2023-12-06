@@ -1,5 +1,5 @@
 {
     "MD013": false,
-    "MD033": { "allowed_elements": ["a"] },
+    "MD033": { "allowed_elements": ["a","details","summary","ol","li"] },
     "markdownlint.run": "onSave"
 }

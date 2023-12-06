@@ -10,7 +10,81 @@ _jonb_: Given __<https://www.mirthcorp.com/community/forums>__/showthread.php?t=
 
 Don't, not even for development.
 
-_jonb_: Postgres is what NextGen uses internally in their paid appliance offerings
+_jonb_: Postgres is what NextGen uses internally in their paid appliance offerings.
+
+## Pull files from SharePoint
+
+_Jon Christian_
+Anyone out there ever created an outbound interface where Mirth pulls down files from SharePoint? We have a request for Mirth to pull down files sitting in SharePoint document storage, but I'm not sure where to begin. I've seen interfaces pushing data up to SharePoint, but not pulling it down.
+
+_pacmano_
+I think a somewhat typical thing folks encounter is whether or not a particular storage thingy (sharepoint, dropbox, box.com, AWS S3, etc) is mountable natively on the operating system such that you can potentially bypass doing a rest interface.
+
+_Michael Hobbs_
+[Gist](https://github.com/MichaelLeeHobbs/mmc/blob/main/src/codeTempaltes/Globals/fetch.mirth.js) for partial impl of JS Fetch.
+Just make a fetch request(s) to SharePoint. Will need to auth somehow so would likely need an initial request to auth then a follow on to grab the docs.
+
+## List channels that are enabled but not configured to start on deploy
+
+_jonb_
+Does anyone have a query handy to list the channels that are enabled but not configured to start on deploy?
+
+_Sean Phelan_
+Are you referring the initial state (Started, Paused, Stopped)..
+Not pretty but gets you whether its enabled and the initialState.
+
+````sql
+--for PG 10.23
+with
+    entries as (select
+                    unnest(xpath('./entry', configuration.value::xml)) as entry
+                FROM
+                    configuration
+                WHERE
+                      category = 'core'
+                  and name::text = 'channelMetadata')
+  , channels_enabled as (select
+                             (xpath('./string/text()', entry))[1]::text as channel_id
+                           , cast((xpath('./com.mirth.connect.model.ChannelMetadata/enabled/text()',
+                                         entry))[1]::text as boolean)      enabled
+                         from
+                             entries)
+select
+    channel_id
+  , c.name as channel_name
+  , enabled
+  , (xpath('./properties/initialState/text()', c.channel::xml))[1]::text
+from
+    channels_enabled ce
+        inner join channel c on c.id = ce.channel_id
+````
+
+_jonb_ with PG 11 or 12 code with XPpath and the relative root syntax.
+
+````sql
+with
+  entries as (SELECT
+                unnest(xpath('/map/entry', configuration.value::xml)) as entry
+              FROM
+                configuration
+              where
+                category = 'core'
+                and name::text = 'channelMetadata')
+  , channels_enabled as (SELECT
+                          xpath('/entry/string/text()', entry))[1]::text as channel_id
+                          , cast((xpath('entry/com.mirth.connect.model.ChannelMetadata/enabled/text()',
+                            entry))[1]::text as boolean) enabled
+                        FROM
+                          entries)
+SELECT
+  channel_id
+  , c.name as channel_name,
+  , enabled
+  , (xpath('/channel/properties/initialState/text()', c.channel::xml))[1]::text as initial_state
+FROM
+  channels_enabled cd
+    inner join channel c on c.id = ce.channel_id;
+````
 
 ## Email a CSV from filesystem
 
@@ -23,27 +97,22 @@ Probably File Reader (raw), use attachment handler (entire message), email sende
 _Anthony Master_
 This is for 3.8.0 from an old instance I use for some testing. But [here](SendFileToEmail.xml) is an example of how I have done this. @Zubcy you have the output file name variable where the content variable should be instead. And for MIME type, you probably want `text/csv`.
 
-## Access _kpalang_'s maven repo
+## Get started creating a Mirth plugin
 
-Legacy URL: <https://maven.kaurpalang.com/repository/maven-public/>
-Updated URL: <https://maven.pkg.github.com/kpalang/mirth-releases-api>
+Clone [Kaur's this repo](https://github.com/kpalang/mirth-plugin-maven-plugin-kt).
 
-Update your maven config with [this](mvn-kpalang.xml) to access the GitHub repo.
+If you had used his [legacy repo](https://github.com/kpalang/mirth-plugin-maven-plugin), the migration path is simple -- all annotations now have `@Mirth` prefix: `@MirthServerClass`, `@MirthClientClass`, etc.
 
-## Resolve error with _kpalang_'s `mirth-plugin-maven-plugin`
+## Access _kpalang_'s latest maven repo
 
-_Nathan Malinowski_
-`com.kaurpalang:mirth-plugin-maven-plugin:1.0.2-SNAPSHOT/maven-metadata.xml failed to transfer from <https://maven.pkg.github.com/kpalang/mirth-releases-api> during a previous attempt. This failure was cached in the local repository and resolution will not be reattempted until the update interval of github has elapsed or updates are forced. Original error: Could not transfer metadata com.kaurpalang:mirth-plugin-maven-plugin:1.0.2-SNAPSHOT/maven-metadata.xml from/to github (<https://maven.pkg.github.com/kpalang/mirth-releases-api>): status code: 401, reason phrase: Unauthorized (401)`
+Add to your pom.xml:
 
-_agermano_
-That particular package it's complaining about isn't in that repo. I'm not sure if that `mirth-plugin-maven-plugin` is being hosted anywhere right now. You can build it yourself.
-
-_Nathan Malinowski_
-Yeah, building it worked.
-
-_agermano_
-[SO link](https://stackoverflow.com/questions/33548395/how-do-i-force-maven-to-use-my-local-repository-rather-than-going-out-to-remote)
-Maybe try building your project with the `-nsu` option so that it's not looking for a newer version of the plugin you built yourself?
+````xml
+<repository>
+    <id>repsy</id>
+    <url>https://repo.repsy.io/mvn/kpalang/mirthconnect</url>
+</repository>
+````
 
 ## Get received and sent message counts for all channels in timeframe
 
@@ -59,6 +128,101 @@ where received_date < '2023-06-12'
 group by connector_name
 order by connector_name asc;
 ````
+
+## CSV to JSON
+
+_AzDave_
+Ok learn mirth----I need some help. I have a CSV file that I pick up. I want to convert it to a JSON and use an API to upload to a site.  I have an API key the gave me to included in the header.  I am looking for a tutorial and youtube seems to haver just JSON to CSV not the reverse. Any tips?
+
+_the_Ron_ with all the answers.
+
+````xml
+<delimited>
+    <row>
+        <column1>ID</column1>
+        <column2> Name</column2>
+        <column3> Address</column3>
+    </row>
+    <row>
+        <column1>1</column1>
+        <column2> Ron Wilson</column2>
+        <column3> 12345 Main Street</column3>
+    </row>
+</delimited>
+````
+
+````csv
+ID, Name, Address
+1, Ron Wilson, 12345 Main Street
+````
+
+![Set data types](screenshot_2023-07-19_at_2.12.27_pm_720.png)
+
+You can configure the header row, the column names and they will transform for you.
+
+````xml
+<delimited>
+    <row1>
+        <ID>ID</ID>
+        <Name> Name</Name>
+        <Address> Address</Address>
+    </row1>
+    <row2>
+        <ID>1</ID>
+        <Name> Ron Wilson</Name>
+        <Address> 12345 Main Street</Address>
+    </row2>
+</delimited>
+````
+
+If you turn on Numbered Rows you will get a changing row element.
+
+````xml
+<delimited>
+    <row>
+        <ID>ID</ID>
+        <Name> Name</Name>
+        <Address> Address</Address>
+    </row>
+    <row>
+        <ID>1</ID>
+        <Name> Ron Wilson</Name>
+        <Address> 12345 Main Street</Address>
+    </row>
+</delimited>
+````
+
+There is a bug that if you only have a single row it will emit the header, of you have more than 1 row you get a message presented on the Source Transformer for each row.
+
+````csv
+ID, Name, Address
+1, Ron Wilson, 12345 Main Street
+2. Sally Sample, 67890 Main Street
+````
+
+````xml
+<delimited>
+    <row>
+        <ID>1</ID>
+        <Name> Ron Wilson</Name>
+        <Address> 12345 Main Street</Address>
+    </row>
+</delimited>
+````
+
+````xml
+<delimited>
+    <row>
+        <ID>2</ID>
+        <Name> Sally Sample</Name>
+        <Address> 45678 Main Strett</Address>
+    </row>
+</delimited>
+````
+
+![Source settings](screenshot_2023-07-19_at_2.24.41_pm_720.png)
+
+![Set data types](screenshot_2023-07-19_at_2.25.05_pm_720.png)
 
 ## Export Mirth admin events for reporting purposes
 
@@ -118,28 +282,12 @@ FROM attribute_rows
 WHERE "key" = 'channel'
 ````
 
-## Compile and run _connect_
-
-To build: `ant -buildfile .\server\mirth-build.xml`
-To run server: `cd .\server\setup && java -jar .\mirth-server-launcher.jar`
-To run client:
-
-* use MCAL with `-k` argument
-* OR the following script
-
-````powershell
-cd server/setup
-#generate classpath
-$cp = (Get-ChildItem './client-lib','./extensions' -Filter *.jar -Recurse -File | Resolve-Path -Relative) -join ";"
-#run the client
-java -cp $cp com.mirth.connect.client.ui.Mirth
-#alternatively
-java -cp $cp com.mirth.connect.client.ui.Mirth https://localhost:8443 0.0.0.0 admin admin
-````
-
 ## Setup _connect_ in an IDE
 
-__Prerequisite__: Make sure your JRE contains `JavaFX`.
+__Prerequisite__:
+
+* Make sure your JRE contains `JavaFX` (e.g. Zulu)
+* For Windows users, ensure a short working directory - 42 chars total was too long
 
 ### VS Code
 
@@ -153,7 +301,20 @@ __Note__: Eclipse currently requires JDK 11+ to run the `ant` script.
 
 ### Netbeans
 
-Netbeans can load Eclipse project file(s), so first follow the guide above.
+Netbeans can load Eclipse project file(s), so first follow the guide above. Then set each project's JDK to 8 or later (right-click each project, select Properties, see bottom center of popup).
+
+### Simplify GUI development
+
+Follow [this sample guide](https://github.com/kpalang/mirth-plugin-guide#4---gui).
+
+## Compile and run _connect_
+
+To build: `ant -f .\server\mirth-build.xml`
+To run server: `cd .\server\setup && java -jar .\mirth-server-launcher.jar`
+To connect via client:
+
+* use [Ballista](https://github.com/kayyagari/ballista/releases)
+* or MCAL with `-k` argument
 
 ## Configure docker port to match internal Mirth port
 
@@ -745,7 +906,7 @@ See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/1
 
 See [this response](https://forums.mirthproject.io/forum/mirth-connect/support/13366-md5-hashing?p=81191#post81191) on using Guava.
 
-_agermano_: Be sure your RAW content is Base64 decoded before hashing - use either _msg_ or _connectorMessage.getRawData()_.
+_agermano_: Be sure your RAW content is Base64 decoded before hashing - use either `msg` or `connectorMessage.getRawData()`.
 
 _NickT_'s working sample
 
@@ -1052,9 +1213,13 @@ const messages = ChannelUtils.getMessageByIndexV2({
     })
 ````
 
+## Test Mirth code in VSCode
+
+See _Qwelm_'s [howto gist](https://gist.github.com/mhokanson/1ba83e6913817358c043b96e205e3499).
+
 ## Access Rhino shell used by Mirth Connect
 
-Outlined by [_jonb_](https://gist.github.com/jonbartels/d8a1b789dd251e30c4a74baac3a3957a). See [here](https://forums.mirthproject.io/forum/mirth-connect/support/18382-run-javascript-in-channel-context-outside-of-mirth#post101735) (and/or [here](https://github.com/tonygermano/connect-vscode)?) to integrate into VS Code.
+Outlined by [_jonb_](https://gist.github.com/jonbartels/d8a1b789dd251e30c4a74baac3a3957a). See [here](https://forums.mirthproject.io/forum/mirth-connect/support/18382-run-javascript-in-channel-context-outside-of-mirth#post101735) (and/or [here](https://github.com/tonygermano/connect-vscode)?) to integrate into VSCode.
 
 ## Create a daily volume report
 
@@ -1243,7 +1408,7 @@ setChannelGroupByName(createdChannelIds, 'PCC Practices', serverEventContext);
 
 ## View the layout of a Mirth database
 
-See [this ER diagram](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png).
+See [this diagram](https://gist.github.com/rogin/89acbb3f86e935f761fcbea8ad0ce9f8) (formerly [here](https://github.com/kayyagari/connect/blob/je/mc-integ-tests/mc-db-tables.png)) or [an HTML version](https://github.com/pacmano1/Mirth-Snippets/blob/main/mirth.html) with tables from the non-free extensions.
 
 ## Calculate average response time for a given channel's messages
 
